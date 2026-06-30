@@ -1,9 +1,10 @@
 import { useSessionStore } from './stores/useSessionStore';
-import { Play, Square, Circle, Mic2, Settings, Activity } from 'lucide-react';
+import { Play, Square, Circle, Mic2, Settings, Activity, Share2 } from 'lucide-react';
 import { BackingTrack } from './components/tracks/BackingTrack';
 import { VocalTrack } from './components/tracks/VocalTrack';
 import { useMetronome } from './hooks/useMetronome';
 import { useTempoDetector } from './hooks/useTempoDetector';
+import { useTimer } from './hooks/useTimer';
 
 function App() {
   const { 
@@ -14,6 +15,7 @@ function App() {
   // Initialize smart helpers
   useMetronome();
   const { showPrompt, detectedBpm, acceptDetectedBpm, dismissPrompt } = useTempoDetector();
+  const { formattedTime } = useTimer();
 
   return (
     <div className="min-h-screen bg-background text-zinc-200 flex flex-col font-sans">
@@ -67,6 +69,10 @@ function App() {
               {backupStatus === 'idle' ? 'Cloud Sync Ready' : backupStatus}
             </span>
           </div>
+          <button className="text-xs bg-primary/20 hover:bg-primary/30 text-primary font-medium px-4 py-1.5 rounded-md transition-colors border border-primary/20 flex items-center gap-2">
+            <Share2 size={14} />
+            Share Project
+          </button>
           <button className="p-2 hover:bg-white/5 rounded-full transition-colors">
             <Settings size={18} className="text-zinc-400" />
           </button>
@@ -134,8 +140,8 @@ function App() {
           </button>
         </div>
 
-        <div className="w-24 text-center">
-          <span className="text-xs text-zinc-500">00:00:00</span>
+        <div className="w-24 text-center font-mono text-zinc-300 bg-black/40 px-3 py-1.5 rounded border border-white/5 tracking-widest text-sm shadow-inner">
+          {formattedTime}
         </div>
       </footer>
     </div>
