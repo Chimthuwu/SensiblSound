@@ -100,9 +100,12 @@ export function BackingTrack() {
             : 'border-dashed border-white/10 hover:border-primary/30 hover:bg-black/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]'
         }`}
       >
+        {/* DAW Gridlines */}
+        <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:calc(100%/16)_100%] z-0" />
+        
         <div 
           ref={containerRef} 
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 w-full h-full z-10"
           style={{ opacity: backingTrack ? 1 : 0, pointerEvents: 'none' }}
         />
         

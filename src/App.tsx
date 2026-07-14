@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useSessionStore } from './stores/useSessionStore';
 import { Play, Square, Circle, Mic2, Settings, Activity, Share2 } from 'lucide-react';
 import { BackingTrack } from './components/tracks/BackingTrack';
@@ -16,6 +17,30 @@ function App() {
   useMetronome();
   const { showPrompt, detectedBpm, acceptDetectedBpm, dismissPrompt } = useTempoDetector();
   const { formattedTime } = useTimer();
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in inputs or select elements
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === 'INPUT' || activeTag === 'SELECT' || activeTag === 'TEXTAREA') {
+        return;
+      }
+      
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsPlaying(!isPlaying);
+      } else if (e.code === 'KeyR') {
+        e.preventDefault();
+        setIsRecording(!isRecording);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isPlaying, isRecording, setIsPlaying, setIsRecording]);
 
   return (
     <div className="min-h-screen bg-background text-zinc-200 flex flex-col font-sans">

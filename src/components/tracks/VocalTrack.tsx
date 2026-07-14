@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react';
-import { Mic2, Volume2, VolumeX } from 'lucide-react';
+import { useRef, useEffect, useState } from 'react';
+import { Mic2, Volume2, VolumeX, Activity, Sliders } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
@@ -106,6 +106,147 @@ export function VocalTrack() {
   const { isRecording, activeTake, setActiveTake, layers, addLayer, removeLayer } = useSessionStore();
   const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady, stream } = useAudioRecorder();
   
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [fxEnabled, setFxEnabled] = useState(true);
+  const [fxSettings, setFxSettings] = useState({
+    compression: 40,
+    eqWarmth: 3,
+    eqClarity: 5,
+    delayTime: 0.35,
+    delayFeedback: 30,
+    saturation: 15,
+    reverbWet: 25,
+  });
+
+  // Manage Real-time Microphone Monitoring FX Loop
+  useEffect(() => {
+    if (!isMonitoring || !stream) return;
+
+    let audioCtx: AudioContext | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    
+    // Nodes
+    let compressor: DynamicsCompressorNode | null = null;
+    let lowShelf: BiquadFilterNode | null = null;
+    let highShelf: BiquadFilterNode | null = null;
+    let waveshaper: WaveShaperNode | null = null;
+    let delayNode: DelayNode | null = null;
+    let delayFeedbackGain: GainNode | null = null;
+    let delayWetGain: GainNode | null = null;
+    let reverbDelay: DelayNode | null = null;
+    let reverbFeedback: GainNode | null = null;
+    let reverbWetGain: GainNode | null = null;
+    let outputGain: GainNode | null = null;
+
+    try {
+      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      source = audioCtx.createMediaStreamSource(stream);
+
+      if (fxEnabled) {
+        // Dynamics Compressor
+        compressor = audioCtx.createDynamicsCompressor();
+        compressor.threshold.value = -50 + (fxSettings.compression / 100) * 30;
+        compressor.knee.value = 35;
+        compressor.ratio.value = 10;
+        compressor.attack.value = 0.005;
+        compressor.release.value = 0.15;
+
+        // EQ
+        lowShelf = audioCtx.createBiquadFilter();
+        lowShelf.type = 'lowshelf';
+        lowShelf.frequency.value = 220;
+        lowShelf.gain.value = fxSettings.eqWarmth;
+
+        highShelf = audioCtx.createBiquadFilter();
+        highShelf.type = 'highshelf';
+        highShelf.frequency.value = 3200;
+        highShelf.gain.value = fxSettings.eqClarity;
+
+        // Saturation
+        waveshaper = audioCtx.createWaveShaper();
+        const makeDistortionCurve = (amount: number) => {
+          const k = typeof amount === 'number' ? amount : 50;
+          const n_samples = 44100;
+          const curve = new Float32Array(n_samples);
+          const deg = Math.PI / 180;
+          for (let i = 0; i < n_samples; ++i) {
+            const x = (i * 2) / n_samples - 1;
+            curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+          }
+          return curve;
+        };
+        waveshaper.curve = makeDistortionCurve(fxSettings.saturation);
+        waveshaper.oversample = '4x';
+
+        // Delay
+        delayNode = audioCtx.createDelay(1.0);
+        delayNode.delayTime.value = fxSettings.delayTime;
+        
+        delayFeedbackGain = audioCtx.createGain();
+        delayFeedbackGain.gain.value = fxSettings.delayFeedback / 100;
+
+        delayNode.connect(delayFeedbackGain);
+        delayFeedbackGain.connect(delayNode);
+
+        delayWetGain = audioCtx.createGain();
+        delayWetGain.gain.value = 0.25;
+
+        // Reverb (Comb-feedback slap back simulation)
+        reverbDelay = audioCtx.createDelay(0.2);
+        reverbDelay.delayTime.value = 0.045;
+
+        reverbFeedback = audioCtx.createGain();
+        reverbFeedback.gain.value = fxSettings.reverbWet / 150;
+        reverbDelay.connect(reverbFeedback);
+        reverbFeedback.connect(reverbDelay);
+
+        reverbWetGain = audioCtx.createGain();
+        reverbWetGain.gain.value = (fxSettings.reverbWet / 100) * 0.35;
+
+        outputGain = audioCtx.createGain();
+        outputGain.gain.value = 0.9;
+
+        // Connect graph
+        source.connect(compressor);
+        compressor.connect(lowShelf);
+        lowShelf.connect(highShelf);
+        highShelf.connect(waveshaper);
+        
+        waveshaper.connect(outputGain);
+
+        waveshaper.connect(delayNode);
+        delayNode.connect(delayWetGain);
+        delayWetGain.connect(outputGain);
+
+        waveshaper.connect(reverbDelay);
+        reverbDelay.connect(reverbWetGain);
+        reverbWetGain.connect(outputGain);
+
+        outputGain.connect(audioCtx.destination);
+      } else {
+        source.connect(audioCtx.destination);
+      }
+    } catch (e) {
+      console.error('Failed to setup monitoring audio routing:', e);
+    }
+
+    return () => {
+      if (source) source.disconnect();
+      if (compressor) compressor.disconnect();
+      if (lowShelf) lowShelf.disconnect();
+      if (highShelf) highShelf.disconnect();
+      if (waveshaper) waveshaper.disconnect();
+      if (delayNode) delayNode.disconnect();
+      if (delayFeedbackGain) delayFeedbackGain.disconnect();
+      if (delayWetGain) delayWetGain.disconnect();
+      if (reverbDelay) reverbDelay.disconnect();
+      if (reverbFeedback) reverbFeedback.disconnect();
+      if (reverbWetGain) reverbWetGain.disconnect();
+      if (outputGain) outputGain.disconnect();
+      if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
+    };
+  }, [isMonitoring, stream, fxEnabled, fxSettings]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const { isReady, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, activeTake?.url);
 
@@ -125,7 +266,7 @@ export function VocalTrack() {
           Vocal Take
         </h2>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {activeTake && !isRecording && (
             <div className="flex items-center gap-3 text-zinc-400 bg-black/30 px-3 py-1.5 rounded-lg border border-white/[0.03]">
               <button onClick={() => setIsMuted(!isMuted)} className="hover:text-primary transition-colors cursor-pointer">
@@ -146,6 +287,19 @@ export function VocalTrack() {
             </div>
           )}
           
+          <button
+            onClick={() => setIsMonitoring(!isMonitoring)}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-300 flex items-center gap-1.5 cursor-pointer font-sans font-semibold ${
+              isMonitoring 
+                ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' 
+                : 'bg-white/[0.04] text-zinc-400 border-white/[0.05] hover:text-white hover:bg-white/[0.08]'
+            }`}
+            title="Listen to your mic input in real-time with FX applied"
+          >
+            <Activity size={14} className={isMonitoring ? 'animate-pulse' : ''} />
+            {isMonitoring ? 'Monitoring ON' : 'Monitor Mic'}
+          </button>
+
           <select 
             value={selectedDeviceId}
             onChange={(e) => setSelectedDeviceId(e.target.value)}
@@ -168,10 +322,13 @@ export function VocalTrack() {
           : 'bg-black/50 border-white/[0.05] hover:border-primary/20 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]'
       }`}>
         
+        {/* DAW Gridlines */}
+        <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:calc(100%/16)_100%] z-0" />
+
         {/* WaveSurfer Container (Only visible when we have a take and not recording) */}
         <div 
           ref={containerRef} 
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 w-full h-full z-10"
           style={{ opacity: (activeTake && !isRecording) ? 1 : 0, pointerEvents: 'none' }}
         />
 
@@ -208,14 +365,14 @@ export function VocalTrack() {
 
       {/* Take Management Controls */}
       {activeTake && !isRecording && (
-        <div className="flex items-center justify-end gap-3 mt-2 border-t border-white/5 pt-4">
+        <div className="flex items-center justify-end gap-3 border-t border-white/5 pt-4">
           <button 
             onClick={() => {
               if (window.confirm("Discard current take and record again?")) {
                 setActiveTake(undefined);
               }
             }}
-            className="text-xs text-zinc-400 hover:text-white px-4 py-2 rounded-md hover:bg-white/5 transition-colors"
+            className="text-xs text-zinc-400 hover:text-white px-4 py-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
           >
             Record Again
           </button>
@@ -224,7 +381,7 @@ export function VocalTrack() {
               addLayer(activeTake);
               setActiveTake(undefined);
             }}
-            className="text-xs bg-primary hover:bg-primary/80 text-white font-medium px-4 py-2 rounded-md transition-colors"
+            className="text-xs bg-primary hover:bg-primary/80 text-white font-medium px-4 py-2 rounded-md transition-colors cursor-pointer"
           >
             Keep as Layer
           </button>
@@ -233,7 +390,7 @@ export function VocalTrack() {
 
       {/* Layers Display */}
       {layers.length > 0 && (
-        <div className="mt-4 space-y-2">
+        <div className="border-t border-white/5 pt-4 space-y-2">
           <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Layers ({layers.length}/5)</h3>
           <div className="flex flex-col gap-2">
             {layers.map((layer, index) => (
@@ -241,7 +398,7 @@ export function VocalTrack() {
                 <span className="text-xs text-zinc-400">Layer {index + 1}</span>
                 <button 
                   onClick={() => removeLayer(layer.id)}
-                  className="text-xs text-red-500 hover:text-red-400 p-1"
+                  className="text-xs text-red-500 hover:text-red-400 p-1 cursor-pointer"
                 >
                   Discard
                 </button>
@@ -250,6 +407,118 @@ export function VocalTrack() {
           </div>
         </div>
       )}
+
+      {/* Vocal FX Rack */}
+      <div className="border-t border-white/[0.04] pt-4 mt-2">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2 font-sans">
+            <Sliders size={13} className="text-primary" />
+            Vocal FX Rack
+          </h3>
+          <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+            <input 
+              type="checkbox" 
+              checked={fxEnabled} 
+              onChange={() => setFxEnabled(!fxEnabled)}
+              className="accent-primary w-3.5 h-3.5 rounded border-white/10"
+            />
+            <span>Enable FX Rack</span>
+          </label>
+        </div>
+        
+        <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 transition-all duration-300 ${fxEnabled ? 'opacity-100' : 'opacity-35 pointer-events-none'}`}>
+          {/* Compression */}
+          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Compressor</span>
+            <input 
+              type="range" 
+              min="0" max="100" 
+              value={fxSettings.compression}
+              onChange={(e) => setFxSettings({ ...fxSettings, compression: parseInt(e.target.value) })}
+              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+            />
+            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.compression}%</span>
+          </div>
+
+          {/* Saturation */}
+          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Saturation</span>
+            <input 
+              type="range" 
+              min="0" max="100" 
+              value={fxSettings.saturation}
+              onChange={(e) => setFxSettings({ ...fxSettings, saturation: parseInt(e.target.value) })}
+              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+            />
+            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.saturation}%</span>
+          </div>
+
+          {/* EQ Warmth */}
+          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Warmth (Low)</span>
+            <input 
+              type="range" 
+              min="-12" max="12" 
+              value={fxSettings.eqWarmth}
+              onChange={(e) => setFxSettings({ ...fxSettings, eqWarmth: parseInt(e.target.value) })}
+              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+            />
+            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.eqWarmth} dB</span>
+          </div>
+
+          {/* EQ Clarity */}
+          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Clarity (High)</span>
+            <input 
+              type="range" 
+              min="-12" max="12" 
+              value={fxSettings.eqClarity}
+              onChange={(e) => setFxSettings({ ...fxSettings, eqClarity: parseInt(e.target.value) })}
+              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+            />
+            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.eqClarity} dB</span>
+          </div>
+
+          {/* Delay Feedback */}
+          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Delay Feedback</span>
+            <input 
+              type="range" 
+              min="0" max="90" 
+              value={fxSettings.delayFeedback}
+              onChange={(e) => setFxSettings({ ...fxSettings, delayFeedback: parseInt(e.target.value) })}
+              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+            />
+            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.delayFeedback}%</span>
+          </div>
+
+          {/* Delay Time */}
+          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Delay Time</span>
+            <input 
+              type="range" 
+              min="10" max="100" 
+              value={fxSettings.delayTime * 100}
+              onChange={(e) => setFxSettings({ ...fxSettings, delayTime: parseFloat(e.target.value) / 100 })}
+              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+            />
+            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.delayTime.toFixed(2)}s</span>
+          </div>
+
+          {/* Reverb */}
+          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Reverb Space</span>
+            <input 
+              type="range" 
+              min="0" max="100" 
+              value={fxSettings.reverbWet}
+              onChange={(e) => setFxSettings({ ...fxSettings, reverbWet: parseInt(e.target.value) })}
+              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+            />
+            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.reverbWet}%</span>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
