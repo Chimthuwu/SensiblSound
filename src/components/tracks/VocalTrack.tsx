@@ -13,25 +13,25 @@ export function VocalTrack() {
   const { isReady, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, activeTake?.url);
 
   return (
-    <section className="bg-surface border border-primary/20 rounded-xl p-4 flex flex-col gap-4 shadow-lg shadow-primary/5 relative overflow-hidden">
+    <section className="bg-surface rounded-2xl p-5 flex flex-col gap-5 shadow-xl shadow-black/40 relative overflow-hidden">
       {isRecording && (
         <motion.div 
           className="absolute inset-0 bg-primary/5 pointer-events-none"
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
+          animate={{ opacity: [0.2, 0.4, 0.2] }}
           transition={{ repeat: Infinity, duration: 2 }}
         />
       )}
       
       <div className="flex items-center justify-between relative z-10">
-        <h2 className="text-sm font-semibold text-primary flex items-center gap-2">
+        <h2 className="text-sm font-bold text-primary flex items-center gap-2 tracking-wide font-sans uppercase">
           <Mic2 size={16} />
           Vocal Take
         </h2>
         
         <div className="flex items-center gap-4">
           {activeTake && !isRecording && (
-            <div className="flex items-center gap-2 text-zinc-400">
-              <button onClick={() => setIsMuted(!isMuted)} className="hover:text-primary transition-colors">
+            <div className="flex items-center gap-3 text-zinc-400 bg-black/30 px-3 py-1.5 rounded-lg border border-white/[0.03]">
+              <button onClick={() => setIsMuted(!isMuted)} className="hover:text-primary transition-colors cursor-pointer">
                 {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
               <input 
@@ -44,7 +44,7 @@ export function VocalTrack() {
                   setIsMuted(false);
                   setVolume(parseFloat(e.target.value));
                 }}
-                className="w-20 accent-primary"
+                className="w-20 accent-primary cursor-pointer"
               />
             </div>
           )}
@@ -53,7 +53,7 @@ export function VocalTrack() {
             value={selectedDeviceId}
             onChange={(e) => setSelectedDeviceId(e.target.value)}
             disabled={isRecording || !micReady}
-            className="text-xs bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-zinc-300 outline-none focus:border-primary/50 transition-colors"
+            className="text-xs bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-zinc-300 outline-none focus:border-primary/50 transition-all cursor-pointer font-sans"
           >
             {!micReady && <option value="">Requesting mic access...</option>}
             {devices.map(device => (
@@ -65,8 +65,10 @@ export function VocalTrack() {
         </div>
       </div>
       
-      <div className={`h-32 rounded-lg border relative overflow-hidden flex items-center justify-center transition-colors ${
-        isRecording ? 'bg-primary/5 border-primary/30' : 'bg-black/40 border-primary/10'
+      <div className={`h-32 rounded-xl border relative overflow-hidden flex items-center justify-center transition-all duration-300 ${
+        isRecording 
+          ? 'bg-primary/5 border-primary shadow-[0_0_15px_rgba(168,85,247,0.1)]' 
+          : 'bg-black/50 border-white/[0.05] hover:border-primary/20 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]'
       }`}>
         
         {/* WaveSurfer Container (Only visible when we have a take and not recording) */}
@@ -78,8 +80,8 @@ export function VocalTrack() {
 
         {/* Loading state for wavesurfer */}
         {activeTake && !isRecording && !isReady && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 backdrop-blur-sm">
-             <span className="text-xs text-primary animate-pulse font-medium">Rendering take...</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0b]/80 z-10 backdrop-blur-sm">
+             <span className="text-xs text-primary animate-pulse font-bold tracking-wider">RENDERING TAKE...</span>
           </div>
         )}
 
@@ -87,18 +89,19 @@ export function VocalTrack() {
         {isRecording && (
           <div className="text-primary text-sm z-10 flex flex-col items-center gap-3">
              <motion.div 
-               className="w-3 h-3 rounded-full bg-red-500"
-               animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+               className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]"
+               animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
                transition={{ repeat: Infinity, duration: 1 }}
              />
-             <span className="font-medium animate-pulse">Recording...</span>
+             <span className="font-bold tracking-wider animate-pulse uppercase text-xs">RECORDING...</span>
           </div>
         )}
 
         {/* Idle State */}
         {!activeTake && !isRecording && (
-          <div className="text-zinc-600 text-sm opacity-50 z-10 relative">
-             Ready to record
+          <div className="text-zinc-400 text-sm flex items-center gap-2 pointer-events-none font-sans tracking-wide select-none">
+            <Mic2 size={18} className="text-zinc-600 animate-pulse" />
+            <span className="font-semibold text-zinc-500">Ready to record vocals</span>
           </div>
         )}
       </div>

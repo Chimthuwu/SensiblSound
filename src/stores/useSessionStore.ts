@@ -3,7 +3,11 @@ import type { SessionState } from '../types';
 
 export const useSessionStore = create<SessionState>((set) => ({
   bpm: 120,
-  backingTrack: undefined,
+  backingTrack: {
+    id: 'default-backing-track',
+    name: 'example.mp3',
+    url: '/example.mp3'
+  },
   activeTake: undefined,
   layers: [],
   isRecording: false,

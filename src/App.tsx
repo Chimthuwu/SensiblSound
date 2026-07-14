@@ -50,98 +50,125 @@ function App() {
       )}
 
       {/* Top Header / Navigation */}
-      <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-surface/50 backdrop-blur-md">
+      <header className="h-16 border-b border-white/[0.04] flex items-center justify-between px-8 bg-background/80 backdrop-blur-md relative z-30">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-            <Mic2 size={18} />
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-sm">
+            <Mic2 size={16} />
           </div>
-          <h1 className="font-semibold text-lg tracking-tight">Sensible Soundlabs</h1>
+          <h1 className="font-semibold text-base tracking-tight text-white font-sans">Sensible Soundlabs</h1>
         </div>
         
-        <div className="flex items-center gap-4 text-sm font-medium">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface border border-white/5">
-            <div className={`w-2 h-2 rounded-full ${
-              backupStatus === 'success' ? 'bg-green-500' :
-              backupStatus === 'uploading' ? 'bg-yellow-500' :
-              backupStatus === 'failed' ? 'bg-red-500' : 'bg-zinc-600'
+        <div className="flex items-center gap-4 text-xs font-medium">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] opacity-60 hover:opacity-100 transition-all duration-300">
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              backupStatus === 'success' ? 'bg-emerald-500' :
+              backupStatus === 'uploading' ? 'bg-amber-500 animate-pulse' :
+              backupStatus === 'failed' ? 'bg-rose-500' : 'bg-zinc-600'
             }`} />
-            <span className="capitalize text-zinc-400">
+            <span className="capitalize text-zinc-400 font-sans tracking-wide">
               {backupStatus === 'idle' ? 'Cloud Sync Ready' : backupStatus}
             </span>
           </div>
-          <button className="text-xs bg-primary/20 hover:bg-primary/30 text-primary font-medium px-4 py-1.5 rounded-md transition-colors border border-primary/20 flex items-center gap-2">
-            <Share2 size={14} />
+          <button className="text-xs bg-primary/10 hover:bg-primary/25 text-primary font-semibold px-4 py-1.5 rounded-lg transition-all duration-300 border border-primary/15 hover:border-primary/30 flex items-center gap-2 cursor-pointer">
+            <Share2 size={13} />
             Share Project
           </button>
-          <button className="p-2 hover:bg-white/5 rounded-full transition-colors">
-            <Settings size={18} className="text-zinc-400" />
+          <button className="p-2 hover:bg-white/[0.04] rounded-lg text-zinc-400 hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/[0.05]">
+            <Settings size={16} />
           </button>
         </div>
       </header>
 
       {/* Main Studio Area */}
-      <main className="flex-1 flex flex-col p-6 gap-6 max-w-6xl mx-auto w-full relative z-10">
+      <main className="flex-1 flex flex-col p-8 gap-6 max-w-6xl mx-auto w-full relative z-10">
         <BackingTrack />
+        
+        {/* Clean hardware-like visual connector divider */}
+        <div className="flex items-center gap-4 px-2 my-1">
+          <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+          <div className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-600 font-sans">Signal Flow</div>
+          <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+        </div>
+
         <VocalTrack />
       </main>
 
       {/* Transport Controls (Bottom Bar) */}
-      <footer className="h-20 border-t border-white/5 bg-surface/90 backdrop-blur-md flex items-center justify-center gap-6 px-6 relative z-20">
+      <footer className="h-24 border-t border-white/[0.04] bg-[#0c0c0e]/95 backdrop-blur-md flex items-center justify-between px-12 relative z-20">
         
-        {/* BPM & Metronome */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-md border border-white/5">
-            <input 
-              type="number" 
-              value={bpm}
-              onChange={(e) => setBpm(Number(e.target.value) || 120)}
-              className="w-12 bg-transparent text-sm font-mono text-zinc-300 outline-none"
-            />
-            <span className="text-xs text-zinc-500 font-mono">BPM</span>
-          </div>
-          
-          <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-            <button 
-              onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
-              className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${
-                isMetronomeEnabled ? 'bg-primary/20 text-primary' : 'bg-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              CLICK
-            </button>
-            <input 
-              type="range" 
-              min="0" max="1" step="0.01" 
-              value={metronomeVolume}
-              onChange={(e) => setMetronomeVolume(parseFloat(e.target.value))}
-              className="w-16 accent-primary opacity-50 hover:opacity-100 transition-opacity"
-            />
+        {/* Left Side: BPM & Metronome */}
+        <div className="flex items-center gap-6 w-1/3">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Tempo</span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <input 
+                  type="number" 
+                  value={bpm}
+                  onChange={(e) => setBpm(Number(e.target.value) || 120)}
+                  className="w-16 bg-transparent text-2xl font-bold font-mono text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="text-[10px] text-zinc-500 font-semibold tracking-wider uppercase font-mono">BPM</span>
+              </div>
+            </div>
+            
+            <div className="h-8 w-[1px] bg-white/[0.08]" />
+            
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
+                  className={`text-[10px] font-bold tracking-wider px-2 py-0.5 rounded transition-all duration-300 cursor-pointer ${
+                    isMetronomeEnabled ? 'bg-primary/20 text-primary border border-primary/25' : 'bg-white/[0.02] border border-white/[0.05] text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  CLICK
+                </button>
+                <input 
+                  type="range" 
+                  min="0" max="1" step="0.01" 
+                  value={metronomeVolume}
+                  onChange={(e) => setMetronomeVolume(parseFloat(e.target.value))}
+                  className="w-20 accent-primary opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Core Transport */}
-        <div className="flex items-center gap-4 border-l border-r border-white/10 px-8">
+        {/* Center: Core Transport Controls */}
+        <div className="flex items-center justify-center gap-6 w-1/3">
           <button 
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isPlaying ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white/5 text-zinc-300 hover:bg-white/10'}`}
+            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border ${
+              isPlaying 
+                ? 'bg-primary text-white border-primary shadow-[0_0_15px_rgba(168,85,247,0.35)]' 
+                : 'bg-white/[0.03] text-zinc-300 border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.1] hover:scale-105'
+            }`}
             onClick={() => setIsPlaying(!isPlaying)}
+            title={isPlaying ? 'Pause' : 'Play'}
           >
-            {isPlaying ? <Square size={20} fill="currentColor" /> : <Play size={22} fill="currentColor" className="ml-1" />}
+            {isPlaying ? <Square size={16} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
           </button>
           
           <button 
-            className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
+            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border ${
               isRecording 
-                ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] hover:bg-red-600' 
-                : 'bg-zinc-800 text-red-500 hover:bg-zinc-700 border-2 border-zinc-700 hover:border-red-500/50'
+                ? 'bg-red-500 text-white border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.55)] scale-105 hover:bg-red-600' 
+                : 'bg-zinc-900 text-red-500 border-red-500/25 hover:border-red-500/60 hover:bg-zinc-800 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:scale-105'
             }`}
             onClick={() => setIsRecording(!isRecording)}
+            title={isRecording ? 'Stop Recording' : 'Record'}
           >
-             {isRecording ? <Square size={20} fill="currentColor" /> : <Circle size={20} fill="currentColor" />}
+             {isRecording ? <Square size={18} fill="currentColor" /> : <Circle size={22} fill="currentColor" />}
           </button>
         </div>
 
-        <div className="w-24 text-center font-mono text-zinc-300 bg-black/40 px-3 py-1.5 rounded border border-white/5 tracking-widest text-sm shadow-inner">
-          {formattedTime}
+        {/* Right Side: Large Format Hardware Timecode */}
+        <div className="flex flex-col items-end w-1/3">
+          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mr-1">Timecode</span>
+          <div className="text-3xl md:text-4xl font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)] selection:bg-transparent select-none mt-0.5">
+            {formattedTime}
+          </div>
         </div>
       </footer>
     </div>

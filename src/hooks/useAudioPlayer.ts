@@ -42,9 +42,14 @@ export function useAudioPlayer(containerRef: React.RefObject<HTMLDivElement | nu
 
   // Handle URL change
   useEffect(() => {
-    if (wavesurfer.current && url) {
-      setIsReady(false);
-      wavesurfer.current.load(url);
+    if (wavesurfer.current) {
+      if (url) {
+        setIsReady(false);
+        wavesurfer.current.load(url);
+      } else {
+        wavesurfer.current.empty();
+        setIsReady(false);
+      }
     }
   }, [url]);
 
