@@ -7,6 +7,7 @@ export function useAudioRecorder() {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isReady, setIsReady] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
   
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
@@ -44,18 +45,43 @@ export function useAudioRecorder() {
   const startRecording = async () => {
     audioChunks.current = [];
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
+      // Disable browser preprocessing (echoCancellation, noiseSuppression, autoGainControl)
+      // which filters and muffles vocal/musical recording.
+      const audioConstraints = selectedDeviceId 
+        ? { 
+            deviceId: { exact: selectedDeviceId },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          } 
+        : {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: audioConstraints
       });
-      streamRef.current = stream;
+      streamRef.current = mediaStream;
+      setStream(mediaStream);
       
-      mediaRecorder.current = new MediaRecorder(stream);
+      // Determine best container type and use a high bitrate for maximum fidelity
+      let options = { audioBitsPerSecond: 256000 } as MediaRecorderOptions;
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        options.mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+        options.mimeType = 'audio/ogg;codecs=opus';
+      }
+
+      mediaRecorder.current = new MediaRecorder(mediaStream, options);
       mediaRecorder.current.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunks.current.push(e.data);
       };
       
       mediaRecorder.current.onstop = async () => {
-        const blob = new Blob(audioChunks.current, { type: 'audio/webm' }); 
+        const mimeType = mediaRecorder.current?.mimeType || 'audio/webm';
+        const blob = new Blob(audioChunks.current, { type: mimeType }); 
         const url = URL.createObjectURL(blob);
         const id = crypto.randomUUID();
         setActiveTake({ id, url, timestamp: Date.now() });
@@ -65,7 +91,8 @@ export function useAudioRecorder() {
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
         }
-
+        setStream(null);
+ 
         // Trigger Backup Process
         useSessionStore.getState().setBackupStatus('uploading');
         const success = await backupService.backupTake(id, url);
@@ -81,6 +108,7 @@ export function useAudioRecorder() {
     } catch (err) {
       console.error("Failed to start recording:", err);
       setIsRecording(false);
+      setStream(null);
     }
   };
 
@@ -95,6 +123,7 @@ export function useAudioRecorder() {
     devices, 
     selectedDeviceId, 
     setSelectedDeviceId,
-    isReady
+    isReady,
+    stream
   };
 }

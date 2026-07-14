@@ -1,13 +1,110 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { Mic2, Volume2, VolumeX } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 
+interface RealtimeWaveformProps {
+  stream: MediaStream;
+}
+
+function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!stream) return;
+
+    let audioCtx: AudioContext | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let analyser: AnalyserNode | null = null;
+    let animationId: number;
+
+    try {
+      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const draw = () => {
+        if (!analyser || !ctx) return;
+        animationId = requestAnimationFrame(draw);
+
+        analyser.getByteTimeDomainData(dataArray);
+
+        // Dark background matching the theme
+        ctx.fillStyle = 'rgba(10, 10, 11, 0.35)';
+        ctx.fillRect(0, 0, rect.width, rect.height);
+
+        // Draw center line
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, rect.height / 2);
+        ctx.lineTo(rect.width, rect.height / 2);
+        ctx.stroke();
+
+        // Draw waveform
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#a855f7'; // Neon purple
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = 'rgba(168, 85, 247, 0.6)';
+        ctx.beginPath();
+
+        const sliceWidth = rect.width / bufferLength;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] / 128.0;
+          const y = (v * rect.height) / 2;
+
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+
+          x += sliceWidth;
+        }
+
+        ctx.lineTo(rect.width, rect.height / 2);
+        ctx.stroke();
+      };
+
+      draw();
+    } catch (e) {
+      console.error('Failed to initialize Web Audio Analyser:', e);
+    }
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      if (source) source.disconnect();
+      if (analyser) analyser.disconnect();
+      if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
+    };
+  }, [stream]);
+
+  return <canvas ref={canvasRef} className="w-full h-full absolute inset-0 rounded-xl" />;
+}
+
 export function VocalTrack() {
   const { isRecording, activeTake, setActiveTake, layers, addLayer, removeLayer } = useSessionStore();
-  const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady } = useAudioRecorder();
+  const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady, stream } = useAudioRecorder();
   
   const containerRef = useRef<HTMLDivElement>(null);
   const { isReady, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, activeTake?.url);
@@ -87,14 +184,17 @@ export function VocalTrack() {
 
         {/* Live Recording State */}
         {isRecording && (
-          <div className="text-primary text-sm z-10 flex flex-col items-center gap-3">
-             <motion.div 
-               className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]"
-               animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
-               transition={{ repeat: Infinity, duration: 1 }}
-             />
-             <span className="font-bold tracking-wider animate-pulse uppercase text-xs">RECORDING...</span>
-          </div>
+          <>
+            {stream && <RealtimeWaveform stream={stream} />}
+            <div className="text-primary text-sm z-10 flex flex-col items-center gap-3 bg-black/40 px-4 py-3 rounded-xl border border-white/[0.03] backdrop-blur-md">
+               <motion.div 
+                 className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]"
+                 animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
+                 transition={{ repeat: Infinity, duration: 1 }}
+               />
+               <span className="font-bold tracking-wider animate-pulse uppercase text-[10px]">RECORDING LIVE</span>
+            </div>
+          </>
         )}
 
         {/* Idle State */}
