@@ -16,6 +16,21 @@ export interface VocalLayer {
   timestamp: number;
 }
 
+export interface FxSettings {
+  autotuneKey: string;
+  autotuneScale: string;
+  autotuneSpeed: number;
+  compression: number;
+  doubleEnabled: boolean;
+  doubleWidth: number;
+  eqLow: number;
+  eqMid: number;
+  eqHigh: number;
+  delayFeedback: number;
+  delayTime: number;
+  reverbWet: number;
+}
+
 export interface SessionState {
   bpm: number;
   backingTrack?: AudioFile;
@@ -26,6 +41,9 @@ export interface SessionState {
   isMetronomeEnabled: boolean;
   metronomeVolume: number;
   backupStatus: "idle" | "uploading" | "success" | "failed";
+  isMonitoring: boolean;
+  fxEnabled: boolean;
+  fxSettings: FxSettings;
   
   // Actions
   setBpm: (bpm: number) => void;
@@ -39,4 +57,7 @@ export interface SessionState {
   setIsMetronomeEnabled: (enabled: boolean) => void;
   setMetronomeVolume: (volume: number) => void;
   setBackupStatus: (status: SessionState['backupStatus']) => void;
+  setIsMonitoring: (enabled: boolean) => void;
+  setFxEnabled: (enabled: boolean) => void;
+  setFxSettings: (settings: Partial<FxSettings>) => void;
 }

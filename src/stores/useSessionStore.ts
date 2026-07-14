@@ -15,6 +15,22 @@ export const useSessionStore = create<SessionState>((set) => ({
   isMetronomeEnabled: false,
   metronomeVolume: 0.5,
   backupStatus: 'idle',
+  isMonitoring: true,
+  fxEnabled: true,
+  fxSettings: {
+    autotuneKey: 'C',
+    autotuneScale: 'Major',
+    autotuneSpeed: 50,
+    compression: 40,
+    doubleEnabled: false,
+    doubleWidth: 70,
+    eqLow: 0,
+    eqMid: 0,
+    eqHigh: 0,
+    delayFeedback: 30,
+    delayTime: 0.35,
+    reverbWet: 25,
+  },
 
   setBpm: (bpm) => set({ bpm }),
   
@@ -42,4 +58,12 @@ export const useSessionStore = create<SessionState>((set) => ({
   setMetronomeVolume: (metronomeVolume) => set({ metronomeVolume }),
   
   setBackupStatus: (backupStatus) => set({ backupStatus }),
+
+  setIsMonitoring: (isMonitoring) => set({ isMonitoring }),
+
+  setFxEnabled: (fxEnabled) => set({ fxEnabled }),
+
+  setFxSettings: (settings) => set((state) => ({
+    fxSettings: { ...state.fxSettings, ...settings }
+  })),
 }));

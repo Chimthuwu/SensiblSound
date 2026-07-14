@@ -3,6 +3,7 @@ import { useSessionStore } from './stores/useSessionStore';
 import { Play, Square, Circle, Mic2, Settings, Activity, Share2 } from 'lucide-react';
 import { BackingTrack } from './components/tracks/BackingTrack';
 import { VocalTrack } from './components/tracks/VocalTrack';
+import { VocalFxRack } from './components/effects/VocalFxRack';
 import { useMetronome } from './hooks/useMetronome';
 import { useTempoDetector } from './hooks/useTempoDetector';
 import { useTimer } from './hooks/useTimer';
@@ -116,6 +117,7 @@ function App() {
         </div>
 
         <VocalTrack />
+        <VocalFxRack />
       </main>
 
       {/* Transport Controls (Bottom Bar) */}

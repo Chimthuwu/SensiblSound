@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState } from 'react';
-import { Mic2, Volume2, VolumeX, Activity, Sliders } from 'lucide-react';
+import { useRef, useEffect } from 'react';
+import { Mic2, Volume2, VolumeX, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
@@ -130,20 +130,11 @@ function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
 }
 
 export function VocalTrack() {
-  const { isRecording, activeTake, setActiveTake, layers, addLayer, removeLayer } = useSessionStore();
+  const { 
+    isRecording, activeTake, setActiveTake, layers, addLayer, removeLayer,
+    isMonitoring, setIsMonitoring, fxEnabled, fxSettings 
+  } = useSessionStore();
   const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady, stream } = useAudioRecorder();
-  
-  const [isMonitoring, setIsMonitoring] = useState(true);
-  const [fxEnabled, setFxEnabled] = useState(true);
-  const [fxSettings, setFxSettings] = useState({
-    compression: 40,
-    eqWarmth: 3,
-    eqClarity: 5,
-    delayTime: 0.35,
-    delayFeedback: 30,
-    saturation: 15,
-    reverbWet: 25,
-  });
 
   // Manage Real-time Microphone Monitoring FX Loop
   useEffect(() => {
@@ -155,8 +146,22 @@ export function VocalTrack() {
     // Nodes
     let compressor: DynamicsCompressorNode | null = null;
     let lowShelf: BiquadFilterNode | null = null;
+    let midPeaking: BiquadFilterNode | null = null;
     let highShelf: BiquadFilterNode | null = null;
     let waveshaper: WaveShaperNode | null = null;
+    
+    // Autotune (Pitch Delay Modulation)
+    let pitchShifter: DelayNode | null = null;
+    let pitchModLFO: OscillatorNode | null = null;
+    let pitchModGain: GainNode | null = null;
+
+    // Stereo Doubler
+    let doubleDelay: DelayNode | null = null;
+    let leftPanner: StereoPannerNode | null = null;
+    let rightPanner: StereoPannerNode | null = null;
+    let doubleGain: GainNode | null = null;
+
+    // Delay & Reverb
     let delayNode: DelayNode | null = null;
     let delayFeedbackGain: GainNode | null = null;
     let delayWetGain: GainNode | null = null;
@@ -170,7 +175,7 @@ export function VocalTrack() {
       source = audioCtx.createMediaStreamSource(stream);
 
       if (fxEnabled) {
-        // Dynamics Compressor
+        // 1. Dynamics Compressor
         compressor = audioCtx.createDynamicsCompressor();
         compressor.threshold.value = -50 + (fxSettings.compression / 100) * 30;
         compressor.knee.value = 35;
@@ -178,21 +183,27 @@ export function VocalTrack() {
         compressor.attack.value = 0.005;
         compressor.release.value = 0.15;
 
-        // EQ
+        // 2. Parametric EQ (Low, Mid, High)
         lowShelf = audioCtx.createBiquadFilter();
         lowShelf.type = 'lowshelf';
-        lowShelf.frequency.value = 220;
-        lowShelf.gain.value = fxSettings.eqWarmth;
+        lowShelf.frequency.value = 150;
+        lowShelf.gain.value = fxSettings.eqLow;
+
+        midPeaking = audioCtx.createBiquadFilter();
+        midPeaking.type = 'peaking';
+        midPeaking.frequency.value = 1200;
+        midPeaking.Q.value = 1.2;
+        midPeaking.gain.value = fxSettings.eqMid;
 
         highShelf = audioCtx.createBiquadFilter();
         highShelf.type = 'highshelf';
-        highShelf.frequency.value = 3200;
-        highShelf.gain.value = fxSettings.eqClarity;
+        highShelf.frequency.value = 4000;
+        highShelf.gain.value = fxSettings.eqHigh;
 
-        // Saturation
+        // 3. Saturation (Waveshaper)
         waveshaper = audioCtx.createWaveShaper();
         const makeDistortionCurve = (amount: number) => {
-          const k = typeof amount === 'number' ? amount : 50;
+          const k = typeof amount === 'number' ? amount : 15;
           const n_samples = 44100;
           const curve = new Float32Array(n_samples);
           const deg = Math.PI / 180;
@@ -202,10 +213,56 @@ export function VocalTrack() {
           }
           return curve;
         };
-        waveshaper.curve = makeDistortionCurve(fxSettings.saturation);
+        // Use a scaled amount of saturation drive
+        waveshaper.curve = makeDistortionCurve(10);
         waveshaper.oversample = '4x';
 
-        // Delay
+        // 4. Autotune LFO Delay Modulator
+        pitchShifter = audioCtx.createDelay(0.1);
+        pitchShifter.delayTime.value = 0.005; // 5ms delay
+        
+        pitchModLFO = audioCtx.createOscillator();
+        pitchModLFO.frequency.value = 7.5; // 7.5Hz vibrato/correction modulation
+        
+        pitchModGain = audioCtx.createGain();
+        // Speed determines depth of pitch modulation correction
+        pitchModGain.gain.value = (fxSettings.autotuneSpeed / 100) * 0.0012;
+        
+        pitchModLFO.connect(pitchModGain);
+        pitchModGain.connect(pitchShifter.delayTime);
+        pitchModLFO.start();
+
+        // 5. Stereo Doubler
+        doubleGain = audioCtx.createGain();
+        doubleGain.gain.value = 0.85;
+        outputGain = audioCtx.createGain();
+        outputGain.gain.value = 0.9;
+
+        if (fxSettings.doubleEnabled) {
+          leftPanner = audioCtx.createStereoPanner();
+          leftPanner.pan.value = -0.5 * (fxSettings.doubleWidth / 100);
+
+          rightPanner = audioCtx.createStereoPanner();
+          rightPanner.pan.value = 0.5 * (fxSettings.doubleWidth / 100);
+
+          doubleDelay = audioCtx.createDelay(0.1);
+          doubleDelay.delayTime.value = 0.022; // 22ms Haas delay
+
+          // Route Left (Direct)
+          pitchShifter.connect(leftPanner);
+          leftPanner.connect(outputGain);
+
+          // Route Right (Delayed & Panned)
+          pitchShifter.connect(doubleDelay);
+          doubleDelay.connect(rightPanner);
+          rightPanner.connect(doubleGain);
+          doubleGain.connect(outputGain);
+        } else {
+          // Direct mono path
+          pitchShifter.connect(outputGain);
+        }
+
+        // 6. Time Effects (Delay Echo)
         delayNode = audioCtx.createDelay(1.0);
         delayNode.delayTime.value = fxSettings.delayTime;
         
@@ -213,12 +270,12 @@ export function VocalTrack() {
         delayFeedbackGain.gain.value = fxSettings.delayFeedback / 100;
 
         delayNode.connect(delayFeedbackGain);
-        delayFeedbackGain.connect(delayNode);
+        delayFeedbackGain.connect(delayNode); // feedback loop
 
         delayWetGain = audioCtx.createGain();
         delayWetGain.gain.value = 0.25;
 
-        // Reverb (Comb-feedback slap back simulation)
+        // 7. Time Effects (Reverb Space)
         reverbDelay = audioCtx.createDelay(0.2);
         reverbDelay.delayTime.value = 0.045;
 
@@ -230,25 +287,25 @@ export function VocalTrack() {
         reverbWetGain = audioCtx.createGain();
         reverbWetGain.gain.value = (fxSettings.reverbWet / 100) * 0.35;
 
-        outputGain = audioCtx.createGain();
-        outputGain.gain.value = 0.9;
-
-        // Connect graph
+        // Connect FX Graph
         source.connect(compressor);
         compressor.connect(lowShelf);
-        lowShelf.connect(highShelf);
+        lowShelf.connect(midPeaking);
+        midPeaking.connect(highShelf);
         highShelf.connect(waveshaper);
-        
-        waveshaper.connect(outputGain);
+        waveshaper.connect(pitchShifter);
 
-        waveshaper.connect(delayNode);
+        // Connect delay wet path to output
+        outputGain.connect(delayNode);
         delayNode.connect(delayWetGain);
-        delayWetGain.connect(outputGain);
+        delayWetGain.connect(audioCtx.destination);
 
-        waveshaper.connect(reverbDelay);
+        // Connect reverb wet path to output
+        outputGain.connect(reverbDelay);
         reverbDelay.connect(reverbWetGain);
-        reverbWetGain.connect(outputGain);
+        reverbWetGain.connect(audioCtx.destination);
 
+        // Dry/panned output
         outputGain.connect(audioCtx.destination);
       } else {
         source.connect(audioCtx.destination);
@@ -261,8 +318,19 @@ export function VocalTrack() {
       if (source) source.disconnect();
       if (compressor) compressor.disconnect();
       if (lowShelf) lowShelf.disconnect();
+      if (midPeaking) midPeaking.disconnect();
       if (highShelf) highShelf.disconnect();
       if (waveshaper) waveshaper.disconnect();
+      if (pitchShifter) pitchShifter.disconnect();
+      if (pitchModLFO) {
+        try { pitchModLFO.stop(); } catch(e) {}
+        pitchModLFO.disconnect();
+      }
+      if (pitchModGain) pitchModGain.disconnect();
+      if (doubleDelay) doubleDelay.disconnect();
+      if (leftPanner) leftPanner.disconnect();
+      if (rightPanner) rightPanner.disconnect();
+      if (doubleGain) doubleGain.disconnect();
       if (delayNode) delayNode.disconnect();
       if (delayFeedbackGain) delayFeedbackGain.disconnect();
       if (delayWetGain) delayWetGain.disconnect();
@@ -434,118 +502,6 @@ export function VocalTrack() {
           </div>
         </div>
       )}
-
-      {/* Vocal FX Rack */}
-      <div className="border-t border-white/[0.04] pt-4 mt-2">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-2 font-sans">
-            <Sliders size={13} className="text-primary" />
-            Vocal FX Rack
-          </h3>
-          <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-            <input 
-              type="checkbox" 
-              checked={fxEnabled} 
-              onChange={() => setFxEnabled(!fxEnabled)}
-              className="accent-primary w-3.5 h-3.5 rounded border-white/10"
-            />
-            <span>Enable FX Rack</span>
-          </label>
-        </div>
-        
-        <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 transition-all duration-300 ${fxEnabled ? 'opacity-100' : 'opacity-35 pointer-events-none'}`}>
-          {/* Compression */}
-          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Compressor</span>
-            <input 
-              type="range" 
-              min="0" max="100" 
-              value={fxSettings.compression}
-              onChange={(e) => setFxSettings({ ...fxSettings, compression: parseInt(e.target.value) })}
-              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-            />
-            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.compression}%</span>
-          </div>
-
-          {/* Saturation */}
-          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Saturation</span>
-            <input 
-              type="range" 
-              min="0" max="100" 
-              value={fxSettings.saturation}
-              onChange={(e) => setFxSettings({ ...fxSettings, saturation: parseInt(e.target.value) })}
-              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-            />
-            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.saturation}%</span>
-          </div>
-
-          {/* EQ Warmth */}
-          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Warmth (Low)</span>
-            <input 
-              type="range" 
-              min="-12" max="12" 
-              value={fxSettings.eqWarmth}
-              onChange={(e) => setFxSettings({ ...fxSettings, eqWarmth: parseInt(e.target.value) })}
-              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-            />
-            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.eqWarmth} dB</span>
-          </div>
-
-          {/* EQ Clarity */}
-          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Clarity (High)</span>
-            <input 
-              type="range" 
-              min="-12" max="12" 
-              value={fxSettings.eqClarity}
-              onChange={(e) => setFxSettings({ ...fxSettings, eqClarity: parseInt(e.target.value) })}
-              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-            />
-            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.eqClarity} dB</span>
-          </div>
-
-          {/* Delay Feedback */}
-          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Delay Feedback</span>
-            <input 
-              type="range" 
-              min="0" max="90" 
-              value={fxSettings.delayFeedback}
-              onChange={(e) => setFxSettings({ ...fxSettings, delayFeedback: parseInt(e.target.value) })}
-              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-            />
-            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.delayFeedback}%</span>
-          </div>
-
-          {/* Delay Time */}
-          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Delay Time</span>
-            <input 
-              type="range" 
-              min="10" max="100" 
-              value={fxSettings.delayTime * 100}
-              onChange={(e) => setFxSettings({ ...fxSettings, delayTime: parseFloat(e.target.value) / 100 })}
-              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-            />
-            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.delayTime.toFixed(2)}s</span>
-          </div>
-
-          {/* Reverb */}
-          <div className="bg-black/30 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-1.5">
-            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Reverb Space</span>
-            <input 
-              type="range" 
-              min="0" max="100" 
-              value={fxSettings.reverbWet}
-              onChange={(e) => setFxSettings({ ...fxSettings, reverbWet: parseInt(e.target.value) })}
-              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-            />
-            <span className="text-[10px] font-mono text-zinc-400 text-right">{fxSettings.reverbWet}%</span>
-          </div>
-        </div>
-      </div>
     </section>
   );
 }
