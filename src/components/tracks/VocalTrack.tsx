@@ -19,6 +19,7 @@ function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
     let source: MediaStreamAudioSourceNode | null = null;
     let analyser: AnalyserNode | null = null;
     let animationId: number;
+    let lastClipTime = 0;
 
     try {
       audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -68,10 +69,15 @@ function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
 
         const sliceWidth = rect.width / bufferLength;
         let x = 0;
+        let hasClipped = false;
 
         for (let i = 0; i < bufferLength; i++) {
           const v = dataArray[i] / 128.0;
           const y = (v * rect.height) / 2;
+
+          if (dataArray[i] <= 1 || dataArray[i] >= 254) {
+            hasClipped = true;
+          }
 
           if (i === 0) {
             ctx.moveTo(x, y);
@@ -84,6 +90,27 @@ function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
 
         ctx.lineTo(rect.width, rect.height / 2);
         ctx.stroke();
+
+        // Manage clip indicator timing
+        if (hasClipped) {
+          lastClipTime = Date.now();
+        }
+
+        // Draw red CLIP warning if clipped in the last 1.5s
+        if (Date.now() - lastClipTime < 1500) {
+          ctx.save();
+          ctx.fillStyle = '#ef4444';
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = 'rgba(239, 68, 68, 0.8)';
+          ctx.font = 'bold 9px monospace';
+          ctx.fillText('CLIP', rect.width - 40, 20);
+          
+          // Draw clip circle
+          ctx.beginPath();
+          ctx.arc(rect.width - 48, 17, 3, 0, 2 * Math.PI);
+          ctx.fill();
+          ctx.restore();
+        }
       };
 
       draw();
@@ -106,7 +133,7 @@ export function VocalTrack() {
   const { isRecording, activeTake, setActiveTake, layers, addLayer, removeLayer } = useSessionStore();
   const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady, stream } = useAudioRecorder();
   
-  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [isMonitoring, setIsMonitoring] = useState(true);
   const [fxEnabled, setFxEnabled] = useState(true);
   const [fxSettings, setFxSettings] = useState({
     compression: 40,

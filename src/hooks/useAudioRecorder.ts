@@ -11,13 +11,14 @@ export function useAudioRecorder() {
   
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
 
-  // Enumerate devices on mount
+  // Enumerate devices on mount and request permission
   useEffect(() => {
     async function getDevices() {
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission first
+        const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission first
+        tempStream.getTracks().forEach(track => track.stop()); // Stop temporary track immediately
+        
         const devs = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devs.filter(d => d.kind === 'audioinput');
         setDevices(audioInputs);
@@ -33,6 +34,40 @@ export function useAudioRecorder() {
     getDevices();
   }, []);
 
+  // Manage persistent stream for active selected device
+  useEffect(() => {
+    if (!selectedDeviceId) return;
+
+    let activeStream: MediaStream | null = null;
+
+    async function setupStream() {
+      try {
+        // Raw quality constraints (no echo cancellation or noise suppression for recording)
+        const audioConstraints = { 
+          deviceId: { exact: selectedDeviceId },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        };
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: audioConstraints
+        });
+        activeStream = mediaStream;
+        setStream(mediaStream);
+      } catch (err) {
+        console.error("Failed to get audio stream for device:", err);
+      }
+    }
+
+    setupStream();
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [selectedDeviceId]);
+
   // Handle Recording State Changes
   useEffect(() => {
     if (isRecording) {
@@ -43,29 +78,13 @@ export function useAudioRecorder() {
   }, [isRecording]);
 
   const startRecording = async () => {
+    if (!stream) {
+      console.error("No active mic stream to record from");
+      setIsRecording(false);
+      return;
+    }
     audioChunks.current = [];
     try {
-      // Disable browser preprocessing (echoCancellation, noiseSuppression, autoGainControl)
-      // which filters and muffles vocal/musical recording.
-      const audioConstraints = selectedDeviceId 
-        ? { 
-            deviceId: { exact: selectedDeviceId },
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-          } 
-        : {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-          };
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: audioConstraints
-      });
-      streamRef.current = mediaStream;
-      setStream(mediaStream);
-      
       // Determine best container type and use a high bitrate for maximum fidelity
       let options = { audioBitsPerSecond: 256000 } as MediaRecorderOptions;
       if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -74,7 +93,7 @@ export function useAudioRecorder() {
         options.mimeType = 'audio/ogg;codecs=opus';
       }
 
-      mediaRecorder.current = new MediaRecorder(mediaStream, options);
+      mediaRecorder.current = new MediaRecorder(stream, options);
       mediaRecorder.current.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunks.current.push(e.data);
       };
@@ -85,13 +104,6 @@ export function useAudioRecorder() {
         const url = URL.createObjectURL(blob);
         const id = crypto.randomUUID();
         setActiveTake({ id, url, timestamp: Date.now() });
-        
-        // Clean up tracks
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
-        setStream(null);
  
         // Trigger Backup Process
         useSessionStore.getState().setBackupStatus('uploading');
@@ -108,7 +120,6 @@ export function useAudioRecorder() {
     } catch (err) {
       console.error("Failed to start recording:", err);
       setIsRecording(false);
-      setStream(null);
     }
   };
 
