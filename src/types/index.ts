@@ -17,6 +17,11 @@ export interface VocalLayer {
 }
 
 export interface FxSettings {
+  autotuneEnabled: boolean;
+  compressorEnabled: boolean;
+  eqEnabled: boolean;
+  delayEnabled: boolean;
+  reverbEnabled: boolean;
   autotuneKey: string;
   autotuneScale: string;
   autotuneSpeed: number;

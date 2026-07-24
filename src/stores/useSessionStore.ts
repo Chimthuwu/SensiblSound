@@ -18,6 +18,11 @@ export const useSessionStore = create<SessionState>((set) => ({
   isMonitoring: true,
   fxEnabled: true,
   fxSettings: {
+    autotuneEnabled: true,
+    compressorEnabled: true,
+    eqEnabled: true,
+    delayEnabled: true,
+    reverbEnabled: true,
     autotuneKey: 'C',
     autotuneScale: 'Major',
     autotuneSpeed: 50,
