@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useSessionStore } from './stores/useSessionStore';
-import { Play, Square, Circle, Mic2, Settings, Activity, Share2 } from 'lucide-react';
+import { Play, Square, Circle, Mic2, Settings, Activity, Share2, SkipBack } from 'lucide-react';
 import { BackingTrack } from './components/tracks/BackingTrack';
 import { VocalTrack } from './components/tracks/VocalTrack';
 import { VocalFxRack } from './components/effects/VocalFxRack';
@@ -8,12 +8,17 @@ import { useMetronome } from './hooks/useMetronome';
 import { useTempoDetector } from './hooks/useTempoDetector';
 import { useTimer } from './hooks/useTimer';
 
+// Transport scrubber max length (10 minutes). Hardcoded for the MVP; could
+// later be derived from the longest loaded audio's duration.
+const TRANSPORT_MAX_MS = 600_000;
+
 function App() {
-  const { 
+  const {
     isRecording, isPlaying, bpm, setBpm, backupStatus, setIsRecording, setIsPlaying,
-    isMetronomeEnabled, setIsMetronomeEnabled, metronomeVolume, setMetronomeVolume
+    isMetronomeEnabled, setIsMetronomeEnabled, metronomeVolume, setMetronomeVolume,
+    transportTimeMs, setTransportTimeMs, rewindTransport
   } = useSessionStore();
-  
+
   // Initialize smart helpers
   useMetronome();
   const { showPrompt, detectedBpm, acceptDetectedBpm, dismissPrompt } = useTempoDetector();
@@ -27,13 +32,17 @@ function App() {
       if (activeTag === 'INPUT' || activeTag === 'SELECT' || activeTag === 'TEXTAREA') {
         return;
       }
-      
+
       if (e.code === 'Space') {
         e.preventDefault();
         setIsPlaying(!isPlaying);
       } else if (e.code === 'KeyR') {
         e.preventDefault();
         setIsRecording(!isRecording);
+      } else if (e.code === 'Home') {
+        // Rewind transport to the start of the project.
+        e.preventDefault();
+        rewindTransport();
       }
     };
 
@@ -41,7 +50,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isPlaying, isRecording, setIsPlaying, setIsRecording]);
+  }, [isPlaying, isRecording, setIsPlaying, setIsRecording, rewindTransport]);
 
   return (
     <div className="min-h-screen bg-background text-zinc-200 flex flex-col font-sans">
@@ -164,34 +173,55 @@ function App() {
         </div>
 
         {/* Center: Core Transport Controls */}
-        <div className="flex items-center justify-center gap-6 w-1/3">
-          <button 
+        <div className="flex items-center justify-center gap-4 w-1/3">
+          <button
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border bg-white/[0.03] text-zinc-300 border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.1] hover:scale-105"
+            onClick={rewindTransport}
+            title="Rewind to start (Home)"
+          >
+            <SkipBack size={16} fill="currentColor" />
+          </button>
+
+          <button
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border ${
-              isPlaying 
-                ? 'bg-primary text-white border-primary shadow-[0_0_15px_rgba(168,85,247,0.35)]' 
+              isPlaying
+                ? 'bg-primary text-white border-primary shadow-[0_0_15px_rgba(168,85,247,0.35)]'
                 : 'bg-white/[0.03] text-zinc-300 border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.1] hover:scale-105'
             }`}
             onClick={() => setIsPlaying(!isPlaying)}
-            title={isPlaying ? 'Pause' : 'Play'}
+            title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
           >
             {isPlaying ? <Square size={16} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
           </button>
-          
-          <button 
+
+          <button
             className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border ${
-              isRecording 
-                ? 'bg-red-500 text-white border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.55)] scale-105 hover:bg-red-600' 
+              isRecording
+                ? 'bg-red-500 text-white border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.55)] scale-105 hover:bg-red-600'
                 : 'bg-zinc-900 text-red-500 border-red-500/25 hover:border-red-500/60 hover:bg-zinc-800 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:scale-105'
             }`}
             onClick={() => setIsRecording(!isRecording)}
-            title={isRecording ? 'Stop Recording' : 'Record'}
+            title={isRecording ? 'Stop Recording (R)' : 'Record (R)'}
           >
              {isRecording ? <Square size={18} fill="currentColor" /> : <Circle size={22} fill="currentColor" />}
           </button>
         </div>
 
-        {/* Right Side: Large Format Hardware Timecode */}
-        <div className="flex flex-col items-end w-1/3">
+        {/* Right Side: Transport Scrub + Hardware Timecode */}
+        <div className="flex flex-col items-end gap-1.5 w-1/3">
+          <div className="flex items-center gap-3 mr-1">
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Transport</span>
+            <input
+              type="range"
+              min="0"
+              max={TRANSPORT_MAX_MS}
+              step={50}
+              value={Math.min(transportTimeMs, TRANSPORT_MAX_MS)}
+              onChange={(e) => setTransportTimeMs(parseInt(e.target.value, 10))}
+              className="w-56 accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+              title="Scrub transport position"
+            />
+          </div>
           <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mr-1">Timecode</span>
           <div className="text-3xl md:text-4xl font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)] selection:bg-transparent select-none mt-0.5">
             {formattedTime}

@@ -85,6 +85,11 @@ export function useAudioRecorder() {
     }
     audioChunks.current = [];
     try {
+      // Capture transport position at the moment recording begins — this stamps
+      // the take with its project-time offset so playback always lines up with
+      // where the vocal was recorded against the backing track.
+      const transportStartMs = useSessionStore.getState().transportTimeMs;
+
       // Determine best container type and use a high bitrate for maximum fidelity
       let options = { audioBitsPerSecond: 256000 } as MediaRecorderOptions;
       if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -97,14 +102,14 @@ export function useAudioRecorder() {
       mediaRecorder.current.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunks.current.push(e.data);
       };
-      
+
       mediaRecorder.current.onstop = async () => {
         const mimeType = mediaRecorder.current?.mimeType || 'audio/webm';
-        const blob = new Blob(audioChunks.current, { type: mimeType }); 
+        const blob = new Blob(audioChunks.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const id = crypto.randomUUID();
-        setActiveTake({ id, url, timestamp: Date.now() });
- 
+        setActiveTake({ id, url, timestamp: Date.now(), transportStartMs });
+
         // Trigger Backup Process
         useSessionStore.getState().setBackupStatus('uploading');
         const success = await backupService.backupTake(id, url);

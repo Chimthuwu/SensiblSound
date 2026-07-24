@@ -8,12 +8,14 @@ export interface VocalTake {
   id: string;
   url: string; // Object URL for playback
   timestamp: number;
+  transportStartMs: number; // Project position where this take was recorded
 }
 
 export interface VocalLayer {
   id: string;
   url: string; // Object URL for playback
   timestamp: number;
+  transportStartMs: number; // Project position where this layer was recorded
 }
 
 export interface FxSettings {
@@ -49,7 +51,8 @@ export interface SessionState {
   isMonitoring: boolean;
   fxEnabled: boolean;
   fxSettings: FxSettings;
-  
+  transportTimeMs: number; // Project playhead position in ms
+
   // Actions
   setBpm: (bpm: number) => void;
   setBackingTrack: (file: AudioFile | undefined) => void;
@@ -65,4 +68,6 @@ export interface SessionState {
   setIsMonitoring: (enabled: boolean) => void;
   setFxEnabled: (enabled: boolean) => void;
   setFxSettings: (settings: Partial<FxSettings>) => void;
+  setTransportTimeMs: (ms: number) => void;
+  rewindTransport: () => void;
 }

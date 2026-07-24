@@ -2,12 +2,13 @@ import { useRef, useState } from 'react';
 import { FileAudio, Volume2, VolumeX, Trash2 } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
+import { TimeRuler } from './TimeRuler';
 
 export function BackingTrack() {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { backingTrack, setBackingTrack } = useSessionStore();
-  const { isReady, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, backingTrack?.url);
+  const { backingTrack, setBackingTrack, bpm } = useSessionStore();
+  const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, backingTrack?.url);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,11 +104,21 @@ export function BackingTrack() {
         {/* DAW Gridlines */}
         <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:calc(100%/16)_100%] z-0" />
         
-        <div 
-          ref={containerRef} 
+        <div
+          ref={containerRef}
           className="absolute inset-0 w-full h-full z-10"
-          style={{ opacity: backingTrack ? 1 : 0, pointerEvents: 'none' }}
+          // Once the backing track is loaded, enable pointer events so clicks/drag
+          // on the waveform seek the global transport (and dynamically disable
+          // before loading so drag-and-drop import still works through this layer).
+          style={{ opacity: backingTrack ? 1 : 0, pointerEvents: (backingTrack && isReady) ? 'auto' : 'none' }}
         />
+
+        {/* Bar-numbered timeline ruler — sits above the wave on z-20, click-through
+            via pointer-events-none. Numbered 1...N with every 4th bar bolded
+            to make phrase boundaries visually obvious for pattern recognition. */}
+        {backingTrack && isReady && (
+          <TimeRuler bpm={bpm} duration={duration} />
+        )}
         
         {!backingTrack && (
           <div className="text-zinc-400 text-sm flex flex-col items-center gap-2 pointer-events-none font-sans tracking-wide">

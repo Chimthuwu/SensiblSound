@@ -251,11 +251,13 @@ export function VocalFxRack() {
 
         {/* Module 1: Autotune & Doubler */}
         <div className="bg-black/20 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-3">
-          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center justify-between gap-2 font-sans border-b border-white/[0.02] pb-1">
-            <span className="flex items-center gap-1.5">
-              <Music size={11} className="text-primary" /> Tuning & Doubler
+          {/* Two-row header: label on top, toggle row right-aligned under it.
+              Prevents label+toggles overflow in narrow grid columns. */}
+          <div className="border-b border-white/[0.02] pb-1.5 flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+              <Music size={11} className="text-primary" /> Tuning &amp; Doubler
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center justify-end gap-1">
               <FxToggleButton
                 enabled={fxSettings.autotuneEnabled}
                 onClick={() => setFxSettings({ autotuneEnabled: !fxSettings.autotuneEnabled })}
@@ -320,15 +322,18 @@ export function VocalFxRack() {
 
         {/* Module 2: Compressor */}
         <div className="bg-black/20 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-3">
-          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center justify-between gap-2 font-sans border-b border-white/[0.02] pb-1">
-            <span className="flex items-center gap-1.5">
+          {/* Two-row header (label + right-aligned toggle row). */}
+          <div className="border-b border-white/[0.02] pb-1.5 flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-sans">
               <Zap size={11} className="text-primary" /> Dynamics
             </span>
-            <FxToggleButton
-              enabled={fxSettings.compressorEnabled}
-              onClick={() => setFxSettings({ compressorEnabled: !fxSettings.compressorEnabled })}
-              label="Comp"
-            />
+            <div className="flex items-center justify-end gap-1">
+              <FxToggleButton
+                enabled={fxSettings.compressorEnabled}
+                onClick={() => setFxSettings({ compressorEnabled: !fxSettings.compressorEnabled })}
+                label="Comp"
+              />
+            </div>
           </div>
           <div className={`flex flex-col gap-3 justify-center h-full pb-1 transition-opacity duration-300 ${(fxEnabled && fxSettings.compressorEnabled) ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
             <div>
@@ -349,16 +354,19 @@ export function VocalFxRack() {
 
         {/* Module 3: Parametric EQ (Visual Drag Only) */}
         <div className="bg-black/20 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-3 lg:col-span-2">
-          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center justify-between gap-2 font-sans border-b border-white/[0.02] pb-1">
-            <span className="flex items-center gap-1.5">
+          {/* Two-row header (label + right-aligned toggle row). */}
+          <div className="border-b border-white/[0.02] pb-1.5 flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-sans">
               <Disc size={11} className="text-primary" /> Parametric EQ
-              <span className="text-[9px] text-zinc-500 font-mono ml-1">Drag points to edit</span>
+              <span className="text-[9px] text-zinc-500 font-mono">Drag points to edit</span>
             </span>
-            <FxToggleButton
-              enabled={fxSettings.eqEnabled}
-              onClick={() => setFxSettings({ eqEnabled: !fxSettings.eqEnabled })}
-              label="EQ"
-            />
+            <div className="flex items-center justify-end gap-1">
+              <FxToggleButton
+                enabled={fxSettings.eqEnabled}
+                onClick={() => setFxSettings({ eqEnabled: !fxSettings.eqEnabled })}
+                label="EQ"
+              />
+            </div>
           </div>
           <div className={`h-28 relative rounded-lg border border-white/[0.03] overflow-hidden transition-opacity duration-300 ${(fxEnabled && fxSettings.eqEnabled) ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
             <canvas
@@ -374,11 +382,12 @@ export function VocalFxRack() {
 
         {/* Module 4: Delay & Reverb */}
         <div className="bg-black/20 rounded-xl p-3 border border-white/[0.02] flex flex-col gap-3">
-          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center justify-between gap-2 font-sans border-b border-white/[0.02] pb-1">
-            <span className="flex items-center gap-1.5">
-              <Flame size={11} className="text-primary" /> Space & Echo
+          {/* Two-row header (label + right-aligned toggle row). */}
+          <div className="border-b border-white/[0.02] pb-1.5 flex flex-col gap-1.5">
+            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+              <Flame size={11} className="text-primary" /> Space &amp; Echo
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center justify-end gap-1">
               <FxToggleButton
                 enabled={fxSettings.delayEnabled}
                 onClick={() => setFxSettings({ delayEnabled: !fxSettings.delayEnabled })}

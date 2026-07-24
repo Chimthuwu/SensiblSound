@@ -361,7 +361,14 @@ export function VocalTrack() {
   }, [isMonitoring, stream, fxEnabled, fxSettings]);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const { isReady, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, activeTake?.url);
+  // Vocal takes are offset-aware: they lock to their recorded project-time offset
+  // (set in useAudioRecorder.startRecording) and ignore clicks (interactive: false)
+  // so the user can't accidentally move the vocal waveform out of sync.
+  const { isReady, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
+    containerRef,
+    activeTake?.url,
+    { startOffsetMs: activeTake?.transportStartMs ?? 0, interactive: false }
+  );
 
   return (
     <section className="bg-surface rounded-2xl p-5 flex flex-col gap-5 shadow-xl shadow-black/40 relative overflow-hidden">

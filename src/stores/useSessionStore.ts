@@ -17,6 +17,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   backupStatus: 'idle',
   isMonitoring: true,
   fxEnabled: true,
+  transportTimeMs: 0,
   fxSettings: {
     autotuneEnabled: true,
     compressorEnabled: true,
@@ -71,4 +72,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   setFxSettings: (settings) => set((state) => ({
     fxSettings: { ...state.fxSettings, ...settings }
   })),
+
+  setTransportTimeMs: (ms) => set({ transportTimeMs: Math.max(0, Math.round(ms)) }),
+
+  rewindTransport: () => set({ transportTimeMs: 0 }),
 }));
