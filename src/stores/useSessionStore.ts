@@ -18,18 +18,18 @@ export const useSessionStore = create<SessionState>((set) => ({
   backupStatus: 'idle',
   cloudBackupStatus: 'idle',
   isMonitoring: true,
-  fxEnabled: true,
+  fxEnabled: false,
   transportTimeMs: 0,
   // Seeded synchronously from localStorage on store creation — this is
   // what makes recordings recoverable after a refresh even though
   // activeTake/layers themselves reset to empty.
   recordingsHistory: recordingHistoryIndex.list(),
   fxSettings: {
-    autotuneEnabled: true,
-    compressorEnabled: true,
-    eqEnabled: true,
-    delayEnabled: true,
-    reverbEnabled: true,
+    autotuneEnabled: false,
+    compressorEnabled: false,
+    eqEnabled: false,
+    delayEnabled: false,
+    reverbEnabled: false,
     autotuneKey: 'C',
     autotuneScale: 'Major',
     autotuneSpeed: 50,

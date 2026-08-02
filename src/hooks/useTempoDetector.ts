@@ -8,7 +8,7 @@ export function useTempoDetector() {
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
-    if (backingTrack) {
+    if (backingTrack && backingTrack.id !== 'default-backing-track') {
       // Simulate Tempo Detection
       setIsDetecting(true);
       setShowPrompt(false);
