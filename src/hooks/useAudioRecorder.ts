@@ -108,7 +108,7 @@ export function useAudioRecorder() {
         const blob = new Blob(audioChunks.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const id = crypto.randomUUID();
-        setActiveTake({ id, url, timestamp: Date.now(), transportStartMs });
+        setActiveTake({ id, url, timestamp: Date.now(), transportStartMs, mimeType });
 
         // Trigger Backup Process
         useSessionStore.getState().setBackupStatus('uploading');

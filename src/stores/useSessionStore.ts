@@ -98,4 +98,16 @@ export const useSessionStore = create<SessionState>((set) => ({
     if (!layer || layer.durationMs === ms) return {};
     return { layers: state.layers.map((l) => l.id === id ? { ...l, durationMs: ms } : l) };
   }),
+
+  markActiveTakeDownloaded: () => set((state) => (
+    state.activeTake && !state.activeTake.downloaded
+      ? { activeTake: { ...state.activeTake, downloaded: true } }
+      : {}
+  )),
+
+  markLayerDownloaded: (id) => set((state) => {
+    const layer = state.layers.find((l) => l.id === id);
+    if (!layer || layer.downloaded) return {};
+    return { layers: state.layers.map((l) => l.id === id ? { ...l, downloaded: true } : l) };
+  }),
 }));

@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { Mic2, Volume2, VolumeX, Activity } from 'lucide-react';
+import { Mic2, Volume2, VolumeX, Activity, Download, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
@@ -8,6 +8,7 @@ import { TimeRuler } from './TimeRuler';
 import { LayerTrack } from './LayerTrack';
 import { Playhead } from './Playhead';
 import { getLayerTimelineDurationMs } from '../../utils/timeline';
+import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 
 interface RealtimeWaveformProps {
   stream: MediaStream;
@@ -136,7 +137,8 @@ function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
 export function VocalTrack() {
   const {
     isRecording, activeTake, setActiveTake, layers, addLayer, removeLayer,
-    isMonitoring, setIsMonitoring, fxEnabled, fxSettings, bpm, setActiveTakeDurationMs
+    isMonitoring, setIsMonitoring, fxEnabled, fxSettings, bpm, setActiveTakeDurationMs,
+    markActiveTakeDownloaded
   } = useSessionStore();
   const layersTimelineDurationMs = useSessionStore(getLayerTimelineDurationMs);
   const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady, stream } = useAudioRecorder();
@@ -384,6 +386,21 @@ export function VocalTrack() {
     }
   }, [activeTake?.id, isReady, duration, setActiveTakeDurationMs]);
 
+  const handleDownloadActiveTake = () => {
+    if (!activeTake) return;
+    downloadBlobUrl(activeTake.url, buildTakeFilename(activeTake.timestamp, 'vocal-take', activeTake.mimeType));
+    markActiveTakeDownloaded();
+  };
+
+  const handleRecordAgain = () => {
+    const message = activeTake && !activeTake.downloaded
+      ? "This take hasn't been downloaded yet — discarding it now means it's gone for good. Discard and record again?"
+      : 'Discard current take and record again?';
+    if (window.confirm(message)) {
+      setActiveTake(undefined);
+    }
+  };
+
   return (
     <section className="bg-surface rounded-2xl p-5 flex flex-col gap-5 shadow-xl shadow-black/40 relative overflow-hidden">
       {isRecording && (
@@ -507,26 +524,51 @@ export function VocalTrack() {
 
       {/* Take Management Controls */}
       {activeTake && !isRecording && (
-        <div className="flex items-center justify-end gap-3 border-t border-white/5 pt-4">
-          <button 
-            onClick={() => {
-              if (window.confirm("Discard current take and record again?")) {
+        <div className="flex flex-col gap-3 border-t border-white/5 pt-4">
+          {/* Unmissable download CTA — this is the main defense against losing
+              a recording (there is currently no other durable copy anywhere).
+              Pulses with a glow until she's actually downloaded it. */}
+          <motion.button
+            onClick={handleDownloadActiveTake}
+            animate={activeTake.downloaded ? {} : {
+              boxShadow: [
+                '0 0 0px rgba(16,185,129,0)',
+                '0 0 22px rgba(16,185,129,0.6)',
+                '0 0 0px rgba(16,185,129,0)',
+              ],
+            }}
+            transition={{ repeat: activeTake.downloaded ? 0 : Infinity, duration: 1.8 }}
+            className={`w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl font-bold text-sm tracking-wide transition-colors cursor-pointer ${
+              activeTake.downloaded
+                ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-950/60'
+                : 'bg-emerald-500 hover:bg-emerald-400 text-black border border-emerald-400'
+            }`}
+            title="Save this recording as a file on your device"
+          >
+            {activeTake.downloaded ? (
+              <><Check size={16} /> Downloaded — saved to your device</>
+            ) : (
+              <><Download size={18} /> Download This Take Now</>
+            )}
+          </motion.button>
+
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={handleRecordAgain}
+              className="text-xs text-zinc-400 hover:text-white px-4 py-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              Record Again
+            </button>
+            <button
+              onClick={() => {
+                addLayer(activeTake);
                 setActiveTake(undefined);
-              }
-            }}
-            className="text-xs text-zinc-400 hover:text-white px-4 py-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
-          >
-            Record Again
-          </button>
-          <button 
-            onClick={() => {
-              addLayer(activeTake);
-              setActiveTake(undefined);
-            }}
-            className="text-xs bg-primary hover:bg-primary/80 text-white font-medium px-4 py-2 rounded-md transition-colors cursor-pointer"
-          >
-            Keep as Layer
-          </button>
+              }}
+              className="text-xs bg-primary hover:bg-primary/80 text-white font-medium px-4 py-2 rounded-md transition-colors cursor-pointer"
+            >
+              Keep as Layer
+            </button>
+          </div>
         </div>
       )}
 

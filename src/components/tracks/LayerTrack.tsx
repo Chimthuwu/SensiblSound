@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Trash2 } from 'lucide-react';
+import { Volume2, VolumeX, Trash2, Download, Check } from 'lucide-react';
 import type { VocalLayer } from '../../types';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
+import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 
 interface LayerTrackProps {
   layer: VocalLayer;
@@ -19,6 +20,7 @@ interface LayerTrackProps {
 export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTrackProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const setLayerDurationMs = useSessionStore((s) => s.setLayerDurationMs);
+  const markLayerDownloaded = useSessionStore((s) => s.markLayerDownloaded);
 
   const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
     containerRef,
@@ -39,6 +41,20 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
   // Before duration is known, fill the remaining lane so the row isn't a
   // zero-width sliver — it snaps to the real size once WaveSurfer decodes.
   const widthPercent = Math.max(0, Math.min(100 - leftPercent, knownWidthPercent || (100 - leftPercent)));
+
+  const handleDownload = () => {
+    downloadBlobUrl(layer.url, buildTakeFilename(layer.timestamp, `vocal-layer-${index + 1}`, layer.mimeType));
+    markLayerDownloaded(layer.id);
+  };
+
+  const handleRemove = () => {
+    const message = layer.downloaded
+      ? `Discard Layer ${index + 1}?`
+      : `Layer ${index + 1} hasn't been downloaded yet — discarding it now means it's gone for good. Discard anyway?`;
+    if (window.confirm(message)) {
+      onRemove(layer.id);
+    }
+  };
 
   return (
     <div className="flex items-center gap-3">
@@ -83,7 +99,17 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
       </div>
 
       <button
-        onClick={() => onRemove(layer.id)}
+        onClick={handleDownload}
+        className={`p-1.5 shrink-0 cursor-pointer transition-colors ${
+          layer.downloaded ? 'text-emerald-500 hover:text-emerald-400' : 'text-zinc-500 hover:text-emerald-400'
+        }`}
+        title={layer.downloaded ? 'Downloaded — click to save again' : 'Download this layer'}
+      >
+        {layer.downloaded ? <Check size={13} /> : <Download size={13} />}
+      </button>
+
+      <button
+        onClick={handleRemove}
         className="text-zinc-500 hover:text-red-400 p-1.5 shrink-0 cursor-pointer transition-colors"
         title="Discard layer"
       >

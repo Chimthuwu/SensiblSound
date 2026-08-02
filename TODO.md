@@ -13,54 +13,58 @@ nothing in `.env`) — everything currently runs client-side only.
 
 ## 🚨 Critical — recordings can be lost, and nothing tells her that
 
-This is the top priority. Right now the app *looks* like it's protecting her
-recordings, but it isn't.
+**Status: core fix shipped.** The app no longer lies about backup, and she
+now has a real, unmissable way to save a recording:
 
-- [ ] **There is no download/export button anywhere in the UI.**
-  Checked `VocalTrack.tsx`, `App.tsx`, and the layers list — a recorded take
-  only ever exists as an in-memory `Blob` object URL
-  ([useAudioRecorder.ts:108-111](src/hooks/useAudioRecorder.ts)). There is
-  currently **no way for her to get a take out of the browser at all.**
-  Closing the tab or refreshing loses it completely (nothing rehydrates
-  `layers`/`activeTake` from storage on load).
-- [ ] **"Cloud Sync" is fully fake.** `backupService.ts`'s
-  `MockCloudProvider.upload()` just `setTimeout`s for 1.5s, randomly fails
-  10% of the time, and returns a string like `cloud-url-<id>` that points
-  to nothing ([backupService.ts:6-18](src/services/backupService.ts)). No
-  network request is ever made. The header pill proudly says "Cloud Sync
-  Ready" / "success" — that's a **false promise** to a user who was told
-  her recordings are being backed up. `restore()` also just throws
-  `"Not implemented for MVP"`, so even if upload were real, nothing could
-  bring a take back.
-- [ ] **The one real safety net (IndexedDB local backup) is currently a
-  write-only black hole.** `localBackup.save()` does persist the blob to
-  IndexedDB, which is good, but there is no UI that lists, restores, or
-  exports what's in there. If she clears her browser data or switches
-  devices, those recordings are unrecoverable even though technically they
-  were "backed up."
+- [utils/download.ts](src/utils/download.ts) (NEW) — real browser file-save
+  via `<a download>` on the take's blob URL, with a sensible filename
+  (`vocal-take-2024-04-06-1421.webm`, extension derived from the actual
+  recorder `mimeType`, now tracked on `VocalTake`/`VocalLayer`).
+- **Unmissable download CTA**
+  ([VocalTrack.tsx](src/components/tracks/VocalTrack.tsx)) — a full-width,
+  pulsing green "Download This Take Now" button appears the instant
+  recording stops, above/before "Record Again" and "Keep as Layer". Stops
+  pulsing and switches to a calm "Downloaded ✓" state once she's saved it.
+  Every kept layer ([LayerTrack.tsx](src/components/tracks/LayerTrack.tsx))
+  now has its own download button too, so nothing is only downloadable
+  once.
+- **Discarding an undownloaded take now warns explicitly** — "Record
+  Again" and layer "Discard" both show a stronger confirm message
+  ("...discarding it now means it's gone for good") when the
+  take/layer hasn't been downloaded yet, instead of the old generic prompt.
+- **`beforeunload` warning** ([App.tsx](src/App.tsx)) — closing or
+  refreshing the tab while any undownloaded take/layer exists now triggers
+  the browser's native "leave site?" confirmation.
+- **"Cloud Sync" no longer lies.** `backupService.backupTake` now reports
+  success/failure based only on the real IndexedDB save — the mocked
+  cloud upload runs best-effort in the background and can no longer flip a
+  successful local save into a false "failed" status (it was doing exactly
+  that: a random 10% fake-network coin-flip was overriding a real,
+  successful local save). The header pill dropped all "Cloud Sync"
+  language — it now says "Saved on This Device" / "Save Failed — Download
+  Now!" / etc., and stays fully visible (not dimmed) on failure.
+  See [backupService.ts](src/services/backupService.ts).
+- Verified in-browser: download fires with correct filename for both
+  active take and layers, `downloaded` flag flips correctly, the
+  `beforeunload` listener attaches/detaches exactly when it should, all
+  four status-pill states render with honest wording, and the
+  discard-warning blocks discarding when cancelled. No console errors.
 
-### Fix plan
-1. **Add a real download button, made obvious.** As soon as a take is
-   recorded, show a prominent "⬇ DOWNLOAD THIS TAKE" call-to-action —
-   not a small icon buried in a toolbar. Use `<a download>` on the take's
-   blob URL (or File System Access API where supported) so it saves an
-   actual `.webm`/`.wav` file to her computer. This should appear the
-   moment recording stops, before she can do anything else, and stay
-   visible/pinned until she's downloaded or explicitly dismisses it.
-2. **Decide on a real cloud backend before claiming "cloud sync" in the
-   UI.** Options: Supabase Storage (session already has Supabase MCP
-   tooling available), S3/R2, or simplest — remove the cloud-sync
-   messaging entirely until it's real, and lean on "Download" as the
-   primary safety mechanism. Whatever we ship, the UI status must reflect
-   what's actually true.
-3. **Add a "Recordings" / take history panel** backed by IndexedDB reads
-   (not just writes) so every take from the session — not just the
-   currently active one — can be replayed and downloaded, even after a
-   refresh.
-4. **Auto-prompt download on risky moments**: before "Record Again"
-   discards a take, before closing/refreshing the tab while an
-   undownloaded take exists (`beforeunload` warning), and after any failed
-   cloud upload.
+Still open:
+- [ ] **No real cloud backend exists.** Checked — there's no Supabase
+  project for this app (only an unrelated one on this account). Local
+  IndexedDB + manual download are the only safety nets right now. Worth
+  deciding deliberately (with her) whether real cloud storage (Supabase
+  Storage, S3/R2) is worth standing up, rather than half-building it.
+- [ ] **No "Recordings" / take history panel.** IndexedDB *does* now
+  reliably hold a copy of every take (via `localBackup.save`), but nothing
+  reads it back — there's still no way to recover a take after a page
+  refresh wipes the in-memory session (`activeTake`/`layers` aren't
+  persisted/rehydrated). A session-persistence pass
+  (see "Other things noticed" below) is really the same fix.
+- [ ] Consider auto-downloading (or at least auto-prompting) right when
+  recording stops, rather than waiting for her to notice the button —
+  the current CTA is prominent but still requires her to act.
 
 ---
 
@@ -149,14 +153,14 @@ Still open:
 
 ## Priority order for next session
 
-1. Download button (make it unmissable) — stop data loss risk immediately.
-   **Still the #1 open item — nothing below replaces this.**
-2. Make backup status honest — either wire up real cloud storage or stop
-   claiming one exists.
-3. Recordings/history panel so nothing is silently lost between takes or
-   across a refresh.
+1. ~~Download button (make it unmissable)~~ — done, see Critical section above.
+2. ~~Make backup status honest~~ — done, see Critical section above.
+3. Recordings/history panel + session persistence (survive a refresh) —
+   the next real gap now that a fresh recording can be manually saved.
 4. ~~Layers-as-timeline-tracks~~ — done, see Timeline section above.
 5. Real (or removed) tempo detection so the grid can be trusted.
+6. Decide, deliberately, whether real cloud storage is worth building
+   (no Supabase project exists for this app yet).
 
 ---
 
