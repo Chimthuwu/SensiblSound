@@ -117,6 +117,16 @@ export function useAudioRecorder() {
         const { localSaved, cloudSaved } = await backupService.backupTake(id, url);
         useSessionStore.getState().setBackupStatus(localSaved ? 'success' : 'failed');
         useSessionStore.getState().setCloudBackupStatus(cloudSaved ? 'success' : 'failed');
+
+        // Only add to the recoverable-history list if a durable copy
+        // actually exists somewhere — an entry that neither backup ever
+        // reaches would just be a dead link in the Recordings panel later.
+        // This runs regardless of what she does next (Keep as Layer /
+        // Record Again / just closing the tab), so a discarded take is
+        // still recoverable from the Recordings panel.
+        if (localSaved || cloudSaved) {
+          useSessionStore.getState().addRecordingHistoryEntry({ id, timestamp: Date.now(), transportStartMs, mimeType });
+        }
       };
       
       mediaRecorder.current.start(1000); // chunk every second
