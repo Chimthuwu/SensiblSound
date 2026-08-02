@@ -6,8 +6,11 @@ should be judged against "does this make her life simpler and her
 recordings safer," not "is this a cool DAW feature."
 
 Stack: React 19 + Vite + TypeScript, Zustand for state, WaveSurfer.js for
-waveforms, Tailwind for styling. No backend exists yet (no Supabase, no API,
-nothing in `.env`) — everything currently runs client-side only.
+waveforms, Tailwind for styling. Backend: Firebase (project `sensible-soundlabs`)
+— anonymous Auth + Storage for real cloud backup of recordings. Config lives
+in `.env` (gitignored; `.env.example` documents the required keys — Firebase
+web API keys aren't secret, security comes from Storage rules, not key
+secrecy).
 
 ---
 
@@ -50,18 +53,54 @@ now has a real, unmissable way to save a recording:
   four status-pill states render with honest wording, and the
   discard-warning blocks discarding when cancelled. No console errors.
 
-Still open:
-- [ ] **No real cloud backend exists.** Checked — there's no Supabase
-  project for this app (only an unrelated one on this account). Local
-  IndexedDB + manual download are the only safety nets right now. Worth
-  deciding deliberately (with her) whether real cloud storage (Supabase
-  Storage, S3/R2) is worth standing up, rather than half-building it.
-- [ ] **No "Recordings" / take history panel.** IndexedDB *does* now
-  reliably hold a copy of every take (via `localBackup.save`), but nothing
-  reads it back — there's still no way to recover a take after a page
-  refresh wipes the in-memory session (`activeTake`/`layers` aren't
-  persisted/rehydrated). A session-persistence pass
-  (see "Other things noticed" below) is really the same fix.
+**Update: real cloud backend wired up (Firebase).** Created the
+`sensible-soundlabs` Firebase project — Storage + Anonymous Auth (no login
+screen for her; she's signed in invisibly so uploads can be scoped to her
+own session). New files:
+- [lib/firebase.ts](src/lib/firebase.ts) — app init + `ensureAnonymousAuth()`.
+- [services/firebaseStorageProvider.ts](src/services/firebaseStorageProvider.ts)
+  — real `upload()`/`restore()` against `recordings/{uid}/{id}`, replacing
+  the deleted `MockCloudProvider`.
+- `backupService.backupTake()` now returns `{ localSaved, cloudSaved }`
+  independently — local (IndexedDB) and cloud (Firebase) are both real now,
+  tracked and reported separately via `backupStatus` / `cloudBackupStatus`.
+  The header shows two honest pills: "Saved on This Device" (local, the
+  one that matters most, stays visible on failure) and "Backed Up to
+  Cloud" (cloud, stays quietly dimmed even on failure since local+download
+  already cover her — a cloud hiccup isn't an emergency).
+
+⚠️ **Not yet fully live — one manual step left:**
+- [ ] **The Storage bucket hasn't been provisioned yet.** Verified directly
+  against the real project via Node (the sandboxed browser preview has no
+  outbound internet, so this couldn't be checked from there): anonymous
+  sign-in works fine, but the Storage bucket itself 404s. Registering the
+  web app in the console does *not* auto-create the bucket — go to
+  **Build → Storage → "Get started"** in the Firebase console to actually
+  provision it, then cloud backup will start working immediately (no code
+  changes needed — `backupService` already fails gracefully to
+  `cloudSaved: false` in the meantime, so nothing is broken, cloud backup
+  is just silently unavailable until this is done).
+- [ ] **Storage security rules need to be pasted in.** Default production
+  rules deny everything. Once Storage is enabled, go to Storage → Rules in
+  the console and paste:
+  ```
+  rules_version = '2';
+  service firebase.storage {
+    match /b/{bucket}/o {
+      match /recordings/{uid}/{fileId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+  }
+  ```
+  This scopes each anonymous session to only read/write its own
+  `recordings/{uid}/` folder — publish the rule, then re-test.
+- [ ] **No "Recordings" / take history panel yet.** `FirebaseStorageProvider.restore()`
+  is implemented and ready to use, and IndexedDB reliably holds a local
+  copy too — but nothing in the UI reads either back yet, so there's still
+  no way to recover a take after a page refresh wipes the in-memory
+  session. This is the natural next step now that both backends can
+  actually restore something.
 - [ ] Consider auto-downloading (or at least auto-prompting) right when
   recording stops, rather than waiting for her to notice the button —
   the current CTA is prominent but still requires her to act.
@@ -155,12 +194,14 @@ Still open:
 
 1. ~~Download button (make it unmissable)~~ — done, see Critical section above.
 2. ~~Make backup status honest~~ — done, see Critical section above.
-3. Recordings/history panel + session persistence (survive a refresh) —
-   the next real gap now that a fresh recording can be manually saved.
-4. ~~Layers-as-timeline-tracks~~ — done, see Timeline section above.
-5. Real (or removed) tempo detection so the grid can be trusted.
-6. Decide, deliberately, whether real cloud storage is worth building
-   (no Supabase project exists for this app yet).
+3. **Finish the Firebase setup** — enable Storage in the console (Build →
+   Storage → Get started) and paste in the security rules above. Two
+   clicks + one paste, then cloud backup goes fully live.
+4. Recordings/history panel + session persistence (survive a refresh) —
+   both backends can restore a take now (`localBackup` + `FirebaseStorageProvider.restore()`),
+   nothing in the UI uses either yet.
+5. ~~Layers-as-timeline-tracks~~ — done, see Timeline section above.
+6. Real (or removed) tempo detection so the grid can be trusted.
 
 ---
 

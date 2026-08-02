@@ -54,7 +54,8 @@ export interface SessionState {
   isPlaying: boolean;
   isMetronomeEnabled: boolean;
   metronomeVolume: number;
-  backupStatus: "idle" | "uploading" | "success" | "failed";
+  backupStatus: "idle" | "uploading" | "success" | "failed"; // local (IndexedDB) save status
+  cloudBackupStatus: "idle" | "uploading" | "success" | "failed"; // real Firebase Storage upload status
   isMonitoring: boolean;
   fxEnabled: boolean;
   fxSettings: FxSettings;
@@ -72,6 +73,7 @@ export interface SessionState {
   setIsMetronomeEnabled: (enabled: boolean) => void;
   setMetronomeVolume: (volume: number) => void;
   setBackupStatus: (status: SessionState['backupStatus']) => void;
+  setCloudBackupStatus: (status: SessionState['cloudBackupStatus']) => void;
   setIsMonitoring: (enabled: boolean) => void;
   setFxEnabled: (enabled: boolean) => void;
   setFxSettings: (settings: Partial<FxSettings>) => void;
