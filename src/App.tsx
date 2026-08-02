@@ -16,7 +16,7 @@ function App() {
   const {
     isRecording, isPlaying, bpm, setBpm, backupStatus, setIsRecording, setIsPlaying,
     isMetronomeEnabled, setIsMetronomeEnabled, metronomeVolume, setMetronomeVolume,
-    transportTimeMs, setTransportTimeMs, rewindTransport
+    transportTimeMs, setTransportTimeMs, rewindTransport, activeTake, layers
   } = useSessionStore();
 
   // Initialize smart helpers
@@ -51,6 +51,28 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isPlaying, isRecording, setIsPlaying, setIsRecording, rewindTransport]);
+
+  // Warn before closing/refreshing the tab if there's a recording she
+  // hasn't downloaded yet — this is currently the only durable copy of her
+  // vocals (there is no real cloud backend), so losing it here means it's
+  // gone. Browsers show their own generic confirmation text regardless of
+  // what's set here; the handler's mere presence is what triggers it.
+  useEffect(() => {
+    const hasUndownloadedRecording = (activeTake && !activeTake.downloaded)
+      || layers.some((layer) => !layer.downloaded);
+
+    if (!hasUndownloadedRecording) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = ''; // required by some browsers to actually show the prompt
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [activeTake, layers]);
 
   return (
     <div className="min-h-screen bg-background text-zinc-200 flex flex-col font-sans">
@@ -94,14 +116,23 @@ function App() {
         </div>
         
         <div className="flex items-center gap-4 text-xs font-medium">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] opacity-60 hover:opacity-100 transition-all duration-300">
+          {/* No real cloud backend exists yet, so this deliberately never
+              claims "cloud sync" — it reflects the one real safety net
+              (IndexedDB) and stays fully visible (not dimmed) when that
+              fails, since that's the moment she most needs to notice. */}
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] transition-all duration-300 ${
+            backupStatus === 'failed' ? '' : 'opacity-60 hover:opacity-100'
+          }`}>
             <div className={`w-1.5 h-1.5 rounded-full ${
               backupStatus === 'success' ? 'bg-emerald-500' :
               backupStatus === 'uploading' ? 'bg-amber-500 animate-pulse' :
-              backupStatus === 'failed' ? 'bg-rose-500' : 'bg-zinc-600'
+              backupStatus === 'failed' ? 'bg-rose-500 animate-pulse' : 'bg-zinc-600'
             }`} />
-            <span className="capitalize text-zinc-400 font-sans tracking-wide">
-              {backupStatus === 'idle' ? 'Cloud Sync Ready' : backupStatus}
+            <span className={`font-sans tracking-wide ${backupStatus === 'failed' ? 'text-rose-400 font-semibold' : 'text-zinc-400'}`}>
+              {backupStatus === 'idle' && 'Not Backed Up Yet'}
+              {backupStatus === 'uploading' && 'Saving to This Device…'}
+              {backupStatus === 'success' && 'Saved on This Device'}
+              {backupStatus === 'failed' && 'Save Failed — Download Now!'}
             </span>
           </div>
           <button className="text-xs bg-primary/10 hover:bg-primary/25 text-primary font-semibold px-4 py-1.5 rounded-lg transition-all duration-300 border border-primary/15 hover:border-primary/30 flex items-center gap-2 cursor-pointer">

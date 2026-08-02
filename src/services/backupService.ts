@@ -3,7 +3,12 @@ export interface BackupProvider {
   restore(id: string): Promise<Blob>;
 }
 
-// A mock provider simulating cloud storage (e.g., R2, S3)
+// Placeholder for a real cloud provider (e.g. Supabase Storage, R2, S3) —
+// not wired to any actual backend yet. Its outcome intentionally does NOT
+// drive `backupService.backupTake`'s return value or the UI's backup
+// status: showing a fake "cloud" success/failure to the user would be a
+// false promise about where their recording actually lives. Only the real
+// local IndexedDB save below is reported.
 export class MockCloudProvider implements BackupProvider {
   async upload(_blob: Blob, id: string): Promise<string> {
     // Simulate network delay
@@ -55,21 +60,25 @@ export const localBackup = {
 
 export const backupService = {
   provider: new MockCloudProvider(),
-  
+
+  // Returns whether the recording now has a real durable copy. That copy is
+  // IndexedDB — there is no cloud backend yet, so the (still-mocked) cloud
+  // upload runs best-effort in the background and is never allowed to flip
+  // this result. Until a real cloud provider exists, downloading the take
+  // to disk is the only way to get it off this device/browser.
   async backupTake(id: string, url: string): Promise<boolean> {
     try {
-      // 1. Fetch blob from the in-memory object URL
       const response = await fetch(url);
       const blob = await response.blob();
-      
-      // 2. Immediately save to local persistent storage (Browser Crash Protection)
       await localBackup.save(id, blob);
-      
-      // 3. Attempt cloud upload
-      await this.provider.upload(blob, id);
+
+      this.provider.upload(blob, id).catch((err) => {
+        console.warn('Cloud backup unavailable (not yet implemented) — recording is still safe locally.', err);
+      });
+
       return true;
     } catch (err) {
-      console.error("Backup failed, but local copy is safe in IndexedDB.", err);
+      console.error('Local backup failed — this recording only exists in memory until it is downloaded.', err);
       return false;
     }
   }
