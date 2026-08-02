@@ -8,6 +8,9 @@ import type { BackupProvider } from './backupService';
 // the Firebase console by hand).
 export class FirebaseStorageProvider implements BackupProvider {
   async upload(blob: Blob, id: string): Promise<string> {
+    if (!storage) {
+      throw new Error("Firebase storage is not configured");
+    }
     const uid = await ensureAnonymousAuth();
     const storageRef = ref(storage, `recordings/${uid}/${id}`);
     await uploadBytes(storageRef, blob, { contentType: blob.type || 'audio/webm' });
@@ -15,6 +18,9 @@ export class FirebaseStorageProvider implements BackupProvider {
   }
 
   async restore(id: string): Promise<Blob> {
+    if (!storage) {
+      throw new Error("Firebase storage is not configured");
+    }
     const uid = await ensureAnonymousAuth();
     const storageRef = ref(storage, `recordings/${uid}/${id}`);
     const url = await getDownloadURL(storageRef);

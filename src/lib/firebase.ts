@@ -12,9 +12,11 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-export const firebaseApp = initializeApp(firebaseConfig);
-export const storage = getStorage(firebaseApp);
-export const auth = getAuth(firebaseApp);
+const hasFirebaseConfig = !!firebaseConfig.apiKey;
+
+export const firebaseApp = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
+export const storage = hasFirebaseConfig ? getStorage(firebaseApp!) : null;
+export const auth = hasFirebaseConfig ? getAuth(firebaseApp!) : null;
 
 let anonymousAuthPromise: Promise<string> | null = null;
 
@@ -23,6 +25,9 @@ let anonymousAuthPromise: Promise<string> | null = null;
 // Cached so repeated calls (one per take backed up) reuse the same
 // in-flight/resolved sign-in instead of racing multiple sign-ins.
 export function ensureAnonymousAuth(): Promise<string> {
+  if (!auth) {
+    return Promise.reject(new Error("Firebase is not configured"));
+  }
   if (anonymousAuthPromise) return anonymousAuthPromise;
 
   anonymousAuthPromise = new Promise((resolve, reject) => {
