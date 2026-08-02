@@ -14,7 +14,7 @@ const TRANSPORT_MAX_MS = 600_000;
 
 function App() {
   const {
-    isRecording, isPlaying, bpm, setBpm, backupStatus, setIsRecording, setIsPlaying,
+    isRecording, isPlaying, bpm, setBpm, backupStatus, cloudBackupStatus, setIsRecording, setIsPlaying,
     isMetronomeEnabled, setIsMetronomeEnabled, metronomeVolume, setMetronomeVolume,
     transportTimeMs, setTransportTimeMs, rewindTransport, activeTake, layers
   } = useSessionStore();
@@ -116,10 +116,9 @@ function App() {
         </div>
         
         <div className="flex items-center gap-4 text-xs font-medium">
-          {/* No real cloud backend exists yet, so this deliberately never
-              claims "cloud sync" — it reflects the one real safety net
-              (IndexedDB) and stays fully visible (not dimmed) when that
-              fails, since that's the moment she most needs to notice. */}
+          {/* Local (IndexedDB) save is the guarantee that matters most, so
+              it stays fully visible (not dimmed) when it fails — that's the
+              moment she most needs to notice. */}
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] transition-all duration-300 ${
             backupStatus === 'failed' ? '' : 'opacity-60 hover:opacity-100'
           }`}>
@@ -135,6 +134,25 @@ function App() {
               {backupStatus === 'failed' && 'Save Failed — Download Now!'}
             </span>
           </div>
+
+          {/* Real Firebase Storage cloud backup, tracked independently of
+              local save — a cloud failure isn't alarming on its own (local +
+              download already cover her), so this one stays quietly dimmed
+              even when it fails. */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] opacity-60 hover:opacity-100 transition-all duration-300">
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              cloudBackupStatus === 'success' ? 'bg-emerald-500' :
+              cloudBackupStatus === 'uploading' ? 'bg-amber-500 animate-pulse' :
+              cloudBackupStatus === 'failed' ? 'bg-rose-500' : 'bg-zinc-600'
+            }`} />
+            <span className="font-sans tracking-wide text-zinc-400">
+              {cloudBackupStatus === 'idle' && 'Cloud Backup Ready'}
+              {cloudBackupStatus === 'uploading' && 'Backing Up to Cloud…'}
+              {cloudBackupStatus === 'success' && 'Backed Up to Cloud'}
+              {cloudBackupStatus === 'failed' && 'Cloud Backup Unavailable'}
+            </span>
+          </div>
+
           <button className="text-xs bg-primary/10 hover:bg-primary/25 text-primary font-semibold px-4 py-1.5 rounded-lg transition-all duration-300 border border-primary/15 hover:border-primary/30 flex items-center gap-2 cursor-pointer">
             <Share2 size={13} />
             Share Project

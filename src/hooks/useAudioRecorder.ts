@@ -110,10 +110,13 @@ export function useAudioRecorder() {
         const id = crypto.randomUUID();
         setActiveTake({ id, url, timestamp: Date.now(), transportStartMs, mimeType });
 
-        // Trigger Backup Process
+        // Trigger Backup Process — local (IndexedDB) and cloud (Firebase
+        // Storage) are independent, both real, and reported honestly.
         useSessionStore.getState().setBackupStatus('uploading');
-        const success = await backupService.backupTake(id, url);
-        useSessionStore.getState().setBackupStatus(success ? 'success' : 'failed');
+        useSessionStore.getState().setCloudBackupStatus('uploading');
+        const { localSaved, cloudSaved } = await backupService.backupTake(id, url);
+        useSessionStore.getState().setBackupStatus(localSaved ? 'success' : 'failed');
+        useSessionStore.getState().setCloudBackupStatus(cloudSaved ? 'success' : 'failed');
       };
       
       mediaRecorder.current.start(1000); // chunk every second

@@ -15,6 +15,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   isMetronomeEnabled: false,
   metronomeVolume: 0.5,
   backupStatus: 'idle',
+  cloudBackupStatus: 'idle',
   isMonitoring: true,
   fxEnabled: true,
   transportTimeMs: 0,
@@ -64,6 +65,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   setMetronomeVolume: (metronomeVolume) => set({ metronomeVolume }),
   
   setBackupStatus: (backupStatus) => set({ backupStatus }),
+
+  setCloudBackupStatus: (cloudBackupStatus) => set({ cloudBackupStatus }),
 
   setIsMonitoring: (isMonitoring) => set({ isMonitoring }),
 
