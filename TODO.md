@@ -69,32 +69,20 @@ own session). New files:
   Cloud" (cloud, stays quietly dimmed even on failure since local+download
   already cover her — a cloud hiccup isn't an emergency).
 
-⚠️ **Not yet fully live — one manual step left:**
-- [ ] **The Storage bucket hasn't been provisioned yet.** Verified directly
-  against the real project via Node (the sandboxed browser preview has no
-  outbound internet, so this couldn't be checked from there): anonymous
-  sign-in works fine, but the Storage bucket itself 404s. Registering the
-  web app in the console does *not* auto-create the bucket — go to
-  **Build → Storage → "Get started"** in the Firebase console to actually
-  provision it, then cloud backup will start working immediately (no code
-  changes needed — `backupService` already fails gracefully to
-  `cloudSaved: false` in the meantime, so nothing is broken, cloud backup
-  is just silently unavailable until this is done).
-- [ ] **Storage security rules need to be pasted in.** Default production
-  rules deny everything. Once Storage is enabled, go to Storage → Rules in
-  the console and paste:
-  ```
-  rules_version = '2';
-  service firebase.storage {
-    match /b/{bucket}/o {
-      match /recordings/{uid}/{fileId} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-    }
-  }
-  ```
-  This scopes each anonymous session to only read/write its own
-  `recordings/{uid}/` folder — publish the rule, then re-test.
+**✅ Fully live and verified.** Storage bucket provisioned, security rules
+published. Confirmed directly against the real project via Node (the
+sandboxed browser preview has no outbound internet, so this was checked
+from outside it) with a real two-user test:
+  - a user can upload to and read their own `recordings/{uid}/` folder
+  - unauthenticated requests are denied
+  - a *different* anonymous user can neither read nor overwrite another
+    user's recordings — the rule is genuinely scoping access per-session,
+    not just nominally present.
+
+Cloud backup is no longer aspirational — it's a second real safety net
+alongside local IndexedDB + manual download.
+
+Still open:
 - [ ] **No "Recordings" / take history panel yet.** `FirebaseStorageProvider.restore()`
   is implemented and ready to use, and IndexedDB reliably holds a local
   copy too — but nothing in the UI reads either back yet, so there's still
@@ -194,12 +182,11 @@ Still open:
 
 1. ~~Download button (make it unmissable)~~ — done, see Critical section above.
 2. ~~Make backup status honest~~ — done, see Critical section above.
-3. **Finish the Firebase setup** — enable Storage in the console (Build →
-   Storage → Get started) and paste in the security rules above. Two
-   clicks + one paste, then cloud backup goes fully live.
+3. ~~Finish the Firebase setup~~ — done, verified live with a real
+   cross-user access test.
 4. Recordings/history panel + session persistence (survive a refresh) —
    both backends can restore a take now (`localBackup` + `FirebaseStorageProvider.restore()`),
-   nothing in the UI uses either yet.
+   nothing in the UI uses either yet. **New top priority.**
 5. ~~Layers-as-timeline-tracks~~ — done, see Timeline section above.
 6. Real (or removed) tempo detection so the grid can be trusted.
 
