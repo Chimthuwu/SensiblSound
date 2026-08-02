@@ -76,4 +76,26 @@ export const useSessionStore = create<SessionState>((set) => ({
   setTransportTimeMs: (ms) => set({ transportTimeMs: Math.max(0, Math.round(ms)) }),
 
   rewindTransport: () => set({ transportTimeMs: 0 }),
+
+  // These three no-op when the duration hasn't actually changed. Without
+  // that guard, a component effect depending on the parent object (e.g.
+  // `activeTake`) would loop forever: set duration -> new object reference
+  // -> effect deps changed -> effect fires -> set duration -> ...
+  setBackingTrackDurationMs: (ms) => set((state) => (
+    state.backingTrack && state.backingTrack.durationMs !== ms
+      ? { backingTrack: { ...state.backingTrack, durationMs: ms } }
+      : {}
+  )),
+
+  setActiveTakeDurationMs: (ms) => set((state) => (
+    state.activeTake && state.activeTake.durationMs !== ms
+      ? { activeTake: { ...state.activeTake, durationMs: ms } }
+      : {}
+  )),
+
+  setLayerDurationMs: (id, ms) => set((state) => {
+    const layer = state.layers.find((l) => l.id === id);
+    if (!layer || layer.durationMs === ms) return {};
+    return { layers: state.layers.map((l) => l.id === id ? { ...l, durationMs: ms } : l) };
+  }),
 }));

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { FileAudio, Volume2, VolumeX, Trash2 } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
@@ -7,9 +7,20 @@ import { TimeRuler } from './TimeRuler';
 export function BackingTrack() {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { backingTrack, setBackingTrack, bpm } = useSessionStore();
+  const { backingTrack, setBackingTrack, bpm, setBackingTrackDurationMs } = useSessionStore();
   const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, backingTrack?.url);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Feed the decoded duration back into the store — the vocal-layer timeline
+  // needs this to keep its own bar grid consistent with the backing track's.
+  // Depend on backingTrack?.id (stable) rather than the object itself: the
+  // setter below replaces that object with a new reference once durationMs
+  // is written, which would otherwise re-trigger this effect forever.
+  useEffect(() => {
+    if (backingTrack && isReady && duration > 0) {
+      setBackingTrackDurationMs(duration * 1000);
+    }
+  }, [backingTrack?.id, isReady, duration, setBackingTrackDurationMs]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

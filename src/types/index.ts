@@ -2,6 +2,7 @@ export interface AudioFile {
   id: string;
   name: string;
   url: string; // Object URL for playback
+  durationMs?: number; // Populated once WaveSurfer decodes the audio
 }
 
 export interface VocalTake {
@@ -9,6 +10,7 @@ export interface VocalTake {
   url: string; // Object URL for playback
   timestamp: number;
   transportStartMs: number; // Project position where this take was recorded
+  durationMs?: number; // Populated once WaveSurfer decodes the audio
 }
 
 export interface VocalLayer {
@@ -16,6 +18,7 @@ export interface VocalLayer {
   url: string; // Object URL for playback
   timestamp: number;
   transportStartMs: number; // Project position where this layer was recorded
+  durationMs?: number; // Populated once WaveSurfer decodes the audio
 }
 
 export interface FxSettings {
@@ -70,4 +73,7 @@ export interface SessionState {
   setFxSettings: (settings: Partial<FxSettings>) => void;
   setTransportTimeMs: (ms: number) => void;
   rewindTransport: () => void;
+  setBackingTrackDurationMs: (ms: number) => void;
+  setActiveTakeDurationMs: (ms: number) => void;
+  setLayerDurationMs: (id: string, ms: number) => void;
 }
