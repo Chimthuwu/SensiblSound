@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { SessionState } from '../types';
+import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 
 export const useSessionStore = create<SessionState>((set) => ({
   bpm: 120,
@@ -19,6 +20,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   isMonitoring: true,
   fxEnabled: true,
   transportTimeMs: 0,
+  // Seeded synchronously from localStorage on store creation — this is
+  // what makes recordings recoverable after a refresh even though
+  // activeTake/layers themselves reset to empty.
+  recordingsHistory: recordingHistoryIndex.list(),
   fxSettings: {
     autotuneEnabled: true,
     compressorEnabled: true,
@@ -112,5 +117,9 @@ export const useSessionStore = create<SessionState>((set) => ({
     const layer = state.layers.find((l) => l.id === id);
     if (!layer || layer.downloaded) return {};
     return { layers: state.layers.map((l) => l.id === id ? { ...l, downloaded: true } : l) };
+  }),
+
+  addRecordingHistoryEntry: (entry) => set({
+    recordingsHistory: recordingHistoryIndex.add(entry)
   }),
 }));

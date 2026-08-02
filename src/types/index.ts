@@ -25,6 +25,18 @@ export interface VocalLayer {
   downloaded?: boolean; // Has she saved this take to disk yet — drives the unmissable-CTA + beforeunload warning
 }
 
+// A durable audit-trail entry for every completed recording, independent
+// of what the active session does with it (Keep as Layer / Record Again /
+// a refresh that wipes activeTake+layers). Persisted to localStorage so it
+// survives a refresh even though the recording's audio itself lives in
+// IndexedDB/Firebase, keyed by the same id.
+export interface RecordingMeta {
+  id: string;
+  timestamp: number;
+  transportStartMs: number;
+  mimeType?: string;
+}
+
 export interface FxSettings {
   autotuneEnabled: boolean;
   compressorEnabled: boolean;
@@ -60,6 +72,7 @@ export interface SessionState {
   fxEnabled: boolean;
   fxSettings: FxSettings;
   transportTimeMs: number; // Project playhead position in ms
+  recordingsHistory: RecordingMeta[]; // Every recording ever made this browser, independent of the active session
 
   // Actions
   setBpm: (bpm: number) => void;
@@ -84,4 +97,5 @@ export interface SessionState {
   setLayerDurationMs: (id: string, ms: number) => void;
   markActiveTakeDownloaded: () => void;
   markLayerDownloaded: (id: string) => void;
+  addRecordingHistoryEntry: (entry: RecordingMeta) => void;
 }
