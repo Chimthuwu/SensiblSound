@@ -4,6 +4,10 @@ import { motion } from 'framer-motion';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
+import { TimeRuler } from './TimeRuler';
+import { LayerTrack } from './LayerTrack';
+import { Playhead } from './Playhead';
+import { getLayerTimelineDurationMs } from '../../utils/timeline';
 
 interface RealtimeWaveformProps {
   stream: MediaStream;
@@ -130,10 +134,11 @@ function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
 }
 
 export function VocalTrack() {
-  const { 
+  const {
     isRecording, activeTake, setActiveTake, layers, addLayer, removeLayer,
-    isMonitoring, setIsMonitoring, fxEnabled, fxSettings 
+    isMonitoring, setIsMonitoring, fxEnabled, fxSettings, bpm, setActiveTakeDurationMs
   } = useSessionStore();
+  const layersTimelineDurationMs = useSessionStore(getLayerTimelineDurationMs);
   const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady, stream } = useAudioRecorder();
 
   // Manage Real-time Microphone Monitoring FX Loop
@@ -364,11 +369,20 @@ export function VocalTrack() {
   // Vocal takes are offset-aware: they lock to their recorded project-time offset
   // (set in useAudioRecorder.startRecording) and ignore clicks (interactive: false)
   // so the user can't accidentally move the vocal waveform out of sync.
-  const { isReady, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
+  const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
     containerRef,
     activeTake?.url,
     { startOffsetMs: activeTake?.transportStartMs ?? 0, interactive: false }
   );
+
+  // Depend on activeTake?.id (stable) rather than the object itself — the
+  // setter replaces that object with a new reference once durationMs is
+  // written, which would otherwise re-trigger this effect forever.
+  useEffect(() => {
+    if (activeTake && isReady && duration > 0) {
+      setActiveTakeDurationMs(duration * 1000);
+    }
+  }, [activeTake?.id, isReady, duration, setActiveTakeDurationMs]);
 
   return (
     <section className="bg-surface rounded-2xl p-5 flex flex-col gap-5 shadow-xl shadow-black/40 relative overflow-hidden">
@@ -442,8 +456,16 @@ export function VocalTrack() {
           : 'bg-black/50 border-white/[0.05] hover:border-primary/20 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]'
       }`}>
         
-        {/* DAW Gridlines */}
-        <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:calc(100%/16)_100%] z-0" />
+        {/* Bar-numbered DAW grid, bpm-synced to the take's own decoded length —
+            same TimeRuler the backing track uses, so bar numbers here mean the
+            same thing they do there. Falls back to a plain grid while
+            recording live or before duration is known, since bar math needs
+            a real duration to be meaningful. */}
+        {activeTake && !isRecording && duration > 0 ? (
+          <TimeRuler bpm={bpm} duration={duration} />
+        ) : (
+          <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:calc(100%/16)_100%] z-0" />
+        )}
 
         {/* WaveSurfer Container (Only visible when we have a take and not recording) */}
         <div 
@@ -508,21 +530,25 @@ export function VocalTrack() {
         </div>
       )}
 
-      {/* Layers Display */}
+      {/* Layers Timeline — stacked DAW-style tracks. All rows share one
+          bpm-synced grid and one playhead (Playhead.tsx) so multiple kept
+          takes visually line up with each other and with the beat, and each
+          row now actually plays back (layers previously had no audio engine
+          wired up at all — they were silent list entries). */}
       {layers.length > 0 && (
-        <div className="border-t border-white/5 pt-4 space-y-2">
+        <div className="border-t border-white/5 pt-4 flex flex-col gap-3">
           <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Layers ({layers.length}/5)</h3>
-          <div className="flex flex-col gap-2">
+          <div className="relative flex flex-col gap-2.5 pt-4 pb-1">
+            <TimeRuler bpm={bpm} duration={layersTimelineDurationMs / 1000} />
+            <Playhead totalDurationMs={layersTimelineDurationMs} />
             {layers.map((layer, index) => (
-              <div key={layer.id} className="flex items-center justify-between bg-black/30 border border-white/5 rounded-md px-3 py-2">
-                <span className="text-xs text-zinc-400">Layer {index + 1}</span>
-                <button 
-                  onClick={() => removeLayer(layer.id)}
-                  className="text-xs text-red-500 hover:text-red-400 p-1 cursor-pointer"
-                >
-                  Discard
-                </button>
-              </div>
+              <LayerTrack
+                key={layer.id}
+                layer={layer}
+                index={index}
+                totalDurationMs={layersTimelineDurationMs}
+                onRemove={removeLayer}
+              />
             ))}
           </div>
         </div>
