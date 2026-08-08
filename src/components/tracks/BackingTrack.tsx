@@ -54,14 +54,14 @@ export function BackingTrack() {
 
   return (
     <section className="bg-surface rounded-2xl p-5 flex flex-col gap-5 shadow-xl shadow-black/40">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <h2 className="text-sm font-bold text-zinc-400 flex items-center gap-2 tracking-wide font-sans uppercase">
           <FileAudio size={16} className="text-primary" />
           Backing Track {backingTrack ? `— ${backingTrack.name}` : ''}
         </h2>
-        <div className="flex flex-wrap items-center gap-2 md:gap-4 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {backingTrack && (
-            <div className="flex items-center gap-3 text-zinc-400 bg-black/30 px-3 py-1.5 rounded-lg border border-white/[0.03] flex-1 md:flex-none justify-center">
+            <div className="flex items-center gap-2 text-zinc-400 bg-black/30 px-3 py-1.5 rounded-lg border border-white/[0.03]">
               <button onClick={() => setIsMuted(!isMuted)} className="hover:text-white transition-colors cursor-pointer">
                 {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
@@ -75,14 +75,14 @@ export function BackingTrack() {
                   setIsMuted(false);
                   setVolume(parseFloat(e.target.value));
                 }}
-                className="w-full md:w-20 accent-primary cursor-pointer"
+                className="w-16 md:w-20 accent-primary cursor-pointer"
               />
             </div>
           )}
           {backingTrack && (
             <button 
               onClick={() => setBackingTrack(undefined)}
-              className="text-xs bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-200 border border-red-500/20 px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer flex-1 md:flex-none"
+              className="text-xs bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-200 border border-red-500/20 px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Trash2 size={13} />
               Clear
@@ -90,7 +90,7 @@ export function BackingTrack() {
           )}
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 flex-1 md:flex-none"
+            className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200"
           >
             {backingTrack ? 'Replace Audio' : 'Import Audio'}
           </button>

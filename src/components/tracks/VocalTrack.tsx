@@ -411,15 +411,15 @@ export function VocalTrack() {
         />
       )}
       
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between relative z-10 gap-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between relative z-10 gap-3">
         <h2 className="text-sm font-bold text-primary flex items-center gap-2 tracking-wide font-sans uppercase">
           <Mic2 size={16} />
           Vocal Take
         </h2>
         
-        <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {activeTake && !isRecording && (
-            <div className="flex items-center gap-3 text-zinc-400 bg-black/30 px-3 py-1.5 rounded-lg border border-white/[0.03] flex-1 md:flex-none justify-center">
+            <div className="flex items-center gap-2 text-zinc-400 bg-black/30 px-3 py-1.5 rounded-lg border border-white/[0.03]">
               <button onClick={() => setIsMuted(!isMuted)} className="hover:text-primary transition-colors cursor-pointer">
                 {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
@@ -433,14 +433,14 @@ export function VocalTrack() {
                   setIsMuted(false);
                   setVolume(parseFloat(e.target.value));
                 }}
-                className="w-full md:w-20 accent-primary cursor-pointer"
+                className="w-16 md:w-20 accent-primary cursor-pointer"
               />
             </div>
           )}
           
           <button
             onClick={() => setIsMonitoring(!isMonitoring)}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer font-sans font-semibold flex-1 md:flex-none ${
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer font-sans font-semibold ${
               isMonitoring 
                 ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' 
                 : 'bg-white/[0.04] text-zinc-400 border-white/[0.05] hover:text-white hover:bg-white/[0.08]'
@@ -455,7 +455,7 @@ export function VocalTrack() {
             value={selectedDeviceId}
             onChange={(e) => setSelectedDeviceId(e.target.value)}
             disabled={isRecording || !micReady}
-            className="text-xs w-full md:w-auto bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-zinc-300 outline-none focus:border-primary/50 transition-all cursor-pointer font-sans flex-1 md:flex-none"
+            className="text-xs bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-zinc-300 outline-none focus:border-primary/50 transition-all cursor-pointer font-sans w-full md:w-auto"
           >
             {!micReady && <option value="">Requesting mic access...</option>}
             {devices.map(device => (
