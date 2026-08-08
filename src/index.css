@@ -17,3 +17,139 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Intro splash (see components/IntroSplash.tsx)
+   Everything here is one-shot (animation-fill-mode: both) so the sequence
+   holds its final frame while the overlay dissolves.
+   --------------------------------------------------------------------------- */
+
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, #17091f 0%, var(--color-background) 55%, #000 100%);
+  opacity: 1;
+  transition: opacity 600ms ease-out, transform 600ms ease-out, filter 600ms ease-out;
+}
+
+/* Pull back and blur out, as if the camera racks focus onto the studio behind. */
+.intro-overlay--leaving {
+  opacity: 0;
+  transform: scale(1.08);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.intro-bloom {
+  position: absolute;
+  width: min(140vmin, 1100px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, rgba(138, 43, 226, 0.12) 40%, transparent 68%);
+  filter: blur(20px);
+  animation: intro-bloom 2200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.intro-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+}
+
+.intro-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 180px;
+  height: 180px;
+  margin: -90px 0 0 -90px;
+  border-radius: 50%;
+  border: 1px solid rgba(168, 85, 247, 0.55);
+  animation: intro-ring 1700ms cubic-bezier(0.16, 1, 0.3, 1) 420ms both;
+}
+
+.intro-ring--delayed {
+  animation-delay: 700ms;
+  border-color: rgba(196, 132, 252, 0.35);
+}
+
+.intro-icon-frame {
+  position: relative;
+  width: clamp(140px, 26vmin, 220px);
+  aspect-ratio: 1;
+  border-radius: 24px;
+  overflow: hidden;
+  animation: intro-icon 1300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  box-shadow:
+    0 0 0 1px rgba(168, 85, 247, 0.25),
+    0 24px 70px -12px rgba(138, 43, 226, 0.65);
+}
+
+.intro-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+}
+
+.intro-shine {
+  position: absolute;
+  inset: -40% -120%;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 65%
+  );
+  mix-blend-mode: screen;
+  animation: intro-shine 900ms ease-in-out 750ms both;
+}
+
+.intro-tagline {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: rgba(228, 228, 231, 0.65);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  margin: 0;
+  animation: intro-tagline 900ms cubic-bezier(0.16, 1, 0.3, 1) 800ms both;
+}
+
+@keyframes intro-bloom {
+  0%   { opacity: 0; transform: scale(0.35); }
+  45%  { opacity: 1; }
+  100% { opacity: 0.75; transform: scale(1); }
+}
+
+/* Icon arrives slightly oversized, hot and out of focus, then settles. */
+@keyframes intro-icon {
+  0%   { opacity: 0; transform: scale(1.22); filter: blur(18px) brightness(1.8); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); filter: blur(0) brightness(1); }
+}
+
+@keyframes intro-ring {
+  0%   { opacity: 0; transform: scale(0.55); }
+  25%  { opacity: 0.8; }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
+@keyframes intro-shine {
+  0%   { opacity: 0; transform: translateX(-115%); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(115%); }
+}
+
+@keyframes intro-tagline {
+  0%   { opacity: 0; transform: translateY(10px); letter-spacing: 0.5em; }
+  100% { opacity: 1; transform: translateY(0); letter-spacing: 0.28em; }
+}
