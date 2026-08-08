@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 // the whole overlay dissolves into the studio. Kept deliberately short — this
 // plays on every open, so anything longer than a couple of seconds turns from
 // "nice touch" into "thing she has to sit through".
-const HOLD_MS = 2200;         // time before the overlay starts dissolving
+const HOLD_MS = 2600;         // time before the overlay starts dissolving
 const REDUCED_HOLD_MS = 1400; // shorter hold when there's no animation to watch
 const FADE_OUT_MS = 600;      // dissolve duration (must match .intro-overlay transition)
 
@@ -61,17 +61,24 @@ export function IntroSplash() {
       <div className="intro-bloom" />
 
       <div className="intro-stage">
-        {/* Two rings expanding out of the icon on a stagger — the "power on" pulse. */}
-        <div className="intro-ring" />
-        <div className="intro-ring intro-ring--delayed" />
+        {/* Everything that radiates from the icon lives in here, so it's all
+            centred on the artwork rather than on the stage (which the tagline
+            drags off-centre). */}
+        <div className="intro-icon-wrap">
+          {/* Two rings expanding out of the icon on a stagger — the "power on" pulse. */}
+          <div className="intro-ring" />
+          <div className="intro-ring intro-ring--delayed" />
+          {/* Slowly rotating conic halo — keeps the frame alive while it holds. */}
+          <div className="intro-halo" />
 
-        <div className="intro-icon-frame">
-          <img src="/ICON.png" alt="" className="intro-icon" draggable={false} />
-          {/* Specular sweep across the artwork once it's settled. */}
-          <div className="intro-shine" />
+          <div className="intro-icon-frame">
+            <img src="/ICON.png" alt="" className="intro-icon" draggable={false} />
+            {/* Specular sweep across the artwork once it's settled. */}
+            <div className="intro-shine" />
+          </div>
         </div>
 
-        <p className="intro-tagline">Made for Sensimilliea 💜</p>
+        <p className="intro-tagline">Made for Sensimilliea</p>
       </div>
     </div>
   );

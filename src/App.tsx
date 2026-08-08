@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useSessionStore } from './stores/useSessionStore';
-import { Play, Square, Circle, Mic2, Settings, Activity, Share2, SkipBack } from 'lucide-react';
+import { Play, Square, Circle, Mic2, Settings, Activity, Share2, SkipBack, HardDrive } from 'lucide-react';
+import { googleDrive } from './lib/googleDrive';
 import { BackingTrack } from './components/tracks/BackingTrack';
 import { VocalTrack } from './components/tracks/VocalTrack';
 import { VocalFxRack } from './components/effects/VocalFxRack';
@@ -16,8 +17,26 @@ function App() {
   const {
     isRecording, isPlaying, bpm, setBpm, backupStatus, cloudBackupStatus, setIsRecording, setIsPlaying,
     isMetronomeEnabled, setIsMetronomeEnabled, metronomeVolume, setMetronomeVolume,
-    transportTimeMs, setTransportTimeMs, rewindTransport, activeTake, layers
+    transportTimeMs, setTransportTimeMs, rewindTransport, activeTake, layers,
+    driveBackupStatus, driveConnection, setDriveConnection
   } = useSessionStore();
+
+  useEffect(() => {
+    if (driveConnection === 'unavailable') return;
+    googleDrive.reconnectSilently().then((connected) => {
+      setDriveConnection(connected ? 'connected' : 'disconnected');
+    });
+  }, [driveConnection, setDriveConnection]);
+
+  const handleDriveConnect = async () => {
+    try {
+      await googleDrive.connect();
+      setDriveConnection('connected');
+    } catch (err) {
+      console.warn('Google Drive connection failed', err);
+    }
+  };
+
 
   // Initialize smart helpers
   useMetronome();
@@ -152,6 +171,33 @@ function App() {
               {cloudBackupStatus === 'failed' && 'Cloud Backup Unavailable'}
             </span>
           </div>
+
+          {driveConnection !== 'unavailable' && (
+            driveConnection === 'connected' ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] opacity-60 hover:opacity-100 transition-all duration-300">
+                <HardDrive size={13} className="text-zinc-400" />
+                <div className={`w-1.5 h-1.5 rounded-full ${
+                  driveBackupStatus === 'success' ? 'bg-emerald-500' :
+                  driveBackupStatus === 'uploading' ? 'bg-amber-500 animate-pulse' :
+                  driveBackupStatus === 'failed' ? 'bg-rose-500' : 'bg-zinc-600'
+                }`} />
+                <span className="font-sans tracking-wide text-zinc-400">
+                  {driveBackupStatus === 'idle' && 'Drive Ready'}
+                  {driveBackupStatus === 'uploading' && 'Saving to Drive…'}
+                  {driveBackupStatus === 'success' && 'Saved to Drive'}
+                  {driveBackupStatus === 'failed' && 'Drive Backup Failed'}
+                </span>
+              </div>
+            ) : (
+              <button 
+                onClick={handleDriveConnect}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] opacity-60 hover:opacity-100 transition-all duration-300 text-zinc-400 hover:text-white cursor-pointer"
+              >
+                <HardDrive size={13} />
+                <span className="font-sans tracking-wide">Connect Drive</span>
+              </button>
+            )
+          )}
 
           <button className="text-xs bg-primary/10 hover:bg-primary/25 text-primary font-semibold px-4 py-1.5 rounded-lg transition-all duration-300 border border-primary/15 hover:border-primary/30 flex items-center gap-2 cursor-pointer">
             <Share2 size={13} />

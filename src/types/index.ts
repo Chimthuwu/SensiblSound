@@ -68,6 +68,11 @@ export interface SessionState {
   metronomeVolume: number;
   backupStatus: "idle" | "uploading" | "success" | "failed"; // local (IndexedDB) save status
   cloudBackupStatus: "idle" | "uploading" | "success" | "failed"; // real Firebase Storage upload status
+  // Google Drive backup into her OWN account. "skipped" is a first-class
+  // state: Drive is opt-in, so not connecting it is a choice, not a fault.
+  driveBackupStatus: "idle" | "uploading" | "success" | "failed" | "skipped";
+  // "unavailable" = no VITE_GOOGLE_CLIENT_ID in this build at all.
+  driveConnection: "unavailable" | "disconnected" | "connecting" | "connected";
   isMonitoring: boolean;
   fxEnabled: boolean;
   fxSettings: FxSettings;
@@ -87,6 +92,8 @@ export interface SessionState {
   setMetronomeVolume: (volume: number) => void;
   setBackupStatus: (status: SessionState['backupStatus']) => void;
   setCloudBackupStatus: (status: SessionState['cloudBackupStatus']) => void;
+  setDriveBackupStatus: (status: SessionState['driveBackupStatus']) => void;
+  setDriveConnection: (status: SessionState['driveConnection']) => void;
   setIsMonitoring: (enabled: boolean) => void;
   setFxEnabled: (enabled: boolean) => void;
   setFxSettings: (settings: Partial<FxSettings>) => void;
