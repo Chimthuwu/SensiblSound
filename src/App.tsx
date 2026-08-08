@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useSessionStore } from './stores/useSessionStore';
 import { Play, Square, Circle, Mic2, Settings, Activity, Share2, SkipBack, HardDrive } from 'lucide-react';
 import { googleDrive } from './lib/googleDrive';
