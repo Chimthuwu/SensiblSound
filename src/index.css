@@ -124,6 +124,34 @@
   animation: intro-tagline 900ms cubic-bezier(0.16, 1, 0.3, 1) 800ms both;
 }
 
+/* Reduced-motion variant: the icon still gets its moment, but nothing moves,
+   scales, blurs or sweeps — it's a straight cross-fade. */
+.intro-overlay--reduced .intro-ring,
+.intro-overlay--reduced .intro-shine {
+  display: none;
+}
+
+.intro-overlay--reduced .intro-bloom,
+.intro-overlay--reduced .intro-icon-frame,
+.intro-overlay--reduced .intro-tagline {
+  animation: intro-fade-only 500ms ease-out both;
+}
+
+.intro-overlay--reduced .intro-tagline {
+  animation-delay: 220ms;
+  letter-spacing: 0.28em;
+}
+
+.intro-overlay--reduced.intro-overlay--leaving {
+  transform: none;
+  filter: none;
+}
+
+@keyframes intro-fade-only {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 @keyframes intro-bloom {
   0%   { opacity: 0; transform: scale(0.35); }
   45%  { opacity: 1; }
