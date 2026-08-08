@@ -38,6 +38,7 @@ export function useAudioPlayer(
 
     wavesurfer.current = WaveSurfer.create({
       container: containerRef.current,
+      url: url || undefined,
       waveColor: '#52525b', // zinc-600
       progressColor: '#a855f7', // primary purple
       barWidth: 2,
@@ -69,6 +70,12 @@ export function useAudioPlayer(
       useSessionStore.getState().setIsPlaying(false);
     });
 
+    wavesurfer.current.on('error', (err) => {
+      console.warn('WaveSurfer error:', err);
+      // Ensure we don't get permanently stuck in "Analyzing..."
+      setIsReady(true);
+    });
+
     // When interactive, user clicks/drags on the wave should drive the global
     // transport scrubber (backing-track is the project timeline reference).
     if (interactive) {
@@ -94,7 +101,10 @@ export function useAudioPlayer(
     setDuration(0);
     if (url) {
       setIsReady(false);
-      wavesurfer.current.load(url);
+      wavesurfer.current.load(url).catch(err => {
+        console.warn('WaveSurfer load failed:', err);
+        setIsReady(true);
+      });
     } else {
       wavesurfer.current.empty();
       setIsReady(false);
