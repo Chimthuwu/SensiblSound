@@ -53,8 +53,8 @@ export function BackingTrack() {
   };
 
   return (
-    <section className="bg-surface rounded-2xl p-5 flex flex-col gap-5 shadow-xl shadow-black/40">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+    <section className="bg-surface rounded-2xl p-3 md:p-5 flex flex-col gap-3 md:gap-5 shadow-xl shadow-black/40">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-3">
         <h2 className="text-sm font-bold text-zinc-400 flex items-center gap-2 tracking-wide font-sans uppercase">
           <FileAudio size={16} className="text-primary" />
           Backing Track {backingTrack ? `— ${backingTrack.name}` : ''}
