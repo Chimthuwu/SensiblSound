@@ -2,12 +2,14 @@ export interface AudioFile {
   id: string;
   name: string;
   url: string; // Object URL for playback
+  blob?: Blob; // Actual file/blob for robust loading
   durationMs?: number; // Populated once WaveSurfer decodes the audio
 }
 
 export interface VocalTake {
   id: string;
   url: string; // Object URL for playback
+  blob?: Blob; // Actual file/blob for robust loading
   timestamp: number;
   transportStartMs: number; // Project position where this take was recorded
   durationMs?: number; // Populated once WaveSurfer decodes the audio
@@ -18,6 +20,7 @@ export interface VocalTake {
 export interface VocalLayer {
   id: string;
   url: string; // Object URL for playback
+  blob?: Blob; // Actual file/blob for robust loading
   timestamp: number;
   transportStartMs: number; // Project position where this layer was recorded
   durationMs?: number; // Populated once WaveSurfer decodes the audio

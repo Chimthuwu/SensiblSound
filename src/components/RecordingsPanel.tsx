@@ -36,7 +36,7 @@ function RecordingRow({ entry, index, alreadyInLayers }: RecordingRowProps) {
       if (action === 'download') {
         downloadBlobUrl(url, buildTakeFilename(entry.timestamp, `recording-${index + 1}`, entry.mimeType));
       } else {
-        addLayer({ id: entry.id, url, timestamp: entry.timestamp, transportStartMs: entry.transportStartMs, mimeType: entry.mimeType });
+        addLayer({ id: entry.id, url, blob, timestamp: entry.timestamp, transportStartMs: entry.transportStartMs, mimeType: entry.mimeType });
         setAdded(true);
       }
     } catch (err) {
