@@ -126,15 +126,15 @@ function App() {
       )}
 
       {/* Top Header / Navigation */}
-      <header className="h-16 border-b border-white/[0.04] flex items-center justify-between px-8 bg-background/80 backdrop-blur-md relative z-30">
+      <header className="h-auto md:h-16 py-3 md:py-0 border-b border-white/[0.04] flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-8 gap-4 bg-background/80 backdrop-blur-md relative z-30">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-sm shrink-0">
             <Mic2 size={16} />
           </div>
-          <h1 className="font-semibold text-base tracking-tight text-white font-sans">Sensible Soundlabs</h1>
+          <h1 className="font-semibold text-base tracking-tight text-white font-sans whitespace-nowrap">Sensible Soundlabs</h1>
         </div>
         
-        <div className="flex items-center gap-4 text-xs font-medium">
+        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 no-scrollbar text-xs font-medium hide-scrollbar whitespace-nowrap">
           {/* Local (IndexedDB) save is the guarantee that matters most, so
               it stays fully visible (not dimmed) when it fails — that's the
               moment she most needs to notice. */}
@@ -199,18 +199,25 @@ function App() {
             )
           )}
 
-          <button className="text-xs bg-primary/10 hover:bg-primary/25 text-primary font-semibold px-4 py-1.5 rounded-lg transition-all duration-300 border border-primary/15 hover:border-primary/30 flex items-center gap-2 cursor-pointer">
+          <button className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0">
+            Desktop DL
+          </button>
+          <button className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0">
+            Android APK DL
+          </button>
+
+          <button className="text-xs bg-primary/10 hover:bg-primary/25 text-primary font-semibold px-4 py-1.5 rounded-lg transition-all duration-300 border border-primary/15 hover:border-primary/30 flex items-center gap-2 cursor-pointer shrink-0">
             <Share2 size={13} />
             Share Project
           </button>
-          <button className="p-2 hover:bg-white/[0.04] rounded-lg text-zinc-400 hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/[0.05]">
+          <button className="p-2 hover:bg-white/[0.04] rounded-lg text-zinc-400 hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/[0.05] shrink-0">
             <Settings size={16} />
           </button>
         </div>
       </header>
 
       {/* Main Studio Area */}
-      <main className="flex-1 flex flex-col p-8 gap-6 max-w-6xl mx-auto w-full relative z-10">
+      <main className="flex-1 flex flex-col p-4 md:p-8 gap-4 md:gap-6 max-w-6xl mx-auto w-full relative z-10">
         <BackingTrack />
         
         {/* Clean hardware-like visual connector divider */}
@@ -225,10 +232,10 @@ function App() {
       </main>
 
       {/* Transport Controls (Bottom Bar) */}
-      <footer className="sticky bottom-0 mt-auto h-24 border-t border-white/[0.04] bg-[#0c0c0e]/95 backdrop-blur-md flex items-center justify-between px-12 z-40">
+      <footer className="sticky bottom-0 mt-auto h-auto md:h-24 py-4 md:py-0 border-t border-white/[0.04] bg-[#0c0c0e]/95 backdrop-blur-md flex flex-col md:flex-row items-center justify-between px-4 md:px-12 z-40 gap-4 md:gap-0">
         
         {/* Left Side: BPM & Metronome */}
-        <div className="flex items-center gap-6 w-1/3">
+        <div className="flex flex-row items-center justify-between md:justify-start gap-4 md:gap-6 w-full md:w-1/3">
           <div className="flex items-center gap-4">
             <div className="flex flex-col">
               <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Tempo</span>
@@ -268,7 +275,7 @@ function App() {
         </div>
 
         {/* Center: Core Transport Controls */}
-        <div className="flex items-center justify-center gap-4 w-1/3">
+        <div className="flex items-center justify-center gap-4 w-full md:w-1/3 order-first md:order-none">
           <button
             className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border bg-white/[0.03] text-zinc-300 border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.1] hover:scale-105"
             onClick={rewindTransport}
@@ -303,7 +310,7 @@ function App() {
         </div>
 
         {/* Right Side: Transport Scrub + Hardware Timecode */}
-        <div className="flex flex-col items-end gap-1.5 w-1/3">
+        <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-end gap-1.5 w-full md:w-1/3">
           <div className="flex items-center gap-3 mr-1">
             <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Transport</span>
             <input
@@ -313,13 +320,15 @@ function App() {
               step={50}
               value={Math.min(transportTimeMs, TRANSPORT_MAX_MS)}
               onChange={(e) => setTransportTimeMs(parseInt(e.target.value, 10))}
-              className="w-56 accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+              className="w-full md:w-56 accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
               title="Scrub transport position"
             />
           </div>
-          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mr-1">Timecode</span>
-          <div className="text-3xl md:text-4xl font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)] selection:bg-transparent select-none mt-0.5">
-            {formattedTime}
+          <div className="flex flex-col md:items-end">
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mr-1 hidden md:block">Timecode</span>
+            <div className="text-2xl md:text-4xl font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)] selection:bg-transparent select-none mt-0.5">
+              {formattedTime}
+            </div>
           </div>
         </div>
       </footer>
