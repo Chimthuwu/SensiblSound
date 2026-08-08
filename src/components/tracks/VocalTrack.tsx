@@ -374,7 +374,7 @@ export function VocalTrack() {
   const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
     containerRef,
     activeTake?.url,
-    { startOffsetMs: activeTake?.transportStartMs ?? 0, interactive: false }
+    { startOffsetMs: activeTake?.transportStartMs ?? 0, interactive: false, blob: activeTake?.blob }
   );
 
   // Depend on activeTake?.id (stable) rather than the object itself — the

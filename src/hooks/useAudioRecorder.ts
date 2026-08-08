@@ -108,7 +108,7 @@ export function useAudioRecorder() {
         const blob = new Blob(audioChunks.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const id = crypto.randomUUID();
-        setActiveTake({ id, url, timestamp: Date.now(), transportStartMs, mimeType });
+        setActiveTake({ id, url, blob, timestamp: Date.now(), transportStartMs, mimeType });
 
         // Trigger Backup Process — local (IndexedDB), cloud (Firebase
         // Storage) and Google Drive are independent, all real, and reported

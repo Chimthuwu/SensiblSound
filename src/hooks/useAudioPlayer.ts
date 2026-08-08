@@ -7,6 +7,8 @@ export interface AudioPlayerOptions {
   startOffsetMs?: number;
   /** When true (default), clicks/drags on the wave seek the global transport. */
   interactive?: boolean;
+  /** Actual file/blob, which is more robust for WaveSurfer to load than object URLs */
+  blob?: Blob;
 }
 
 export function useAudioPlayer(
@@ -38,7 +40,6 @@ export function useAudioPlayer(
 
     wavesurfer.current = WaveSurfer.create({
       container: containerRef.current,
-      url: url || undefined,
       waveColor: '#52525b', // zinc-600
       progressColor: '#a855f7', // primary purple
       barWidth: 2,
@@ -92,24 +93,33 @@ export function useAudioPlayer(
     };
   }, [interactive]);
 
-  // Handle URL change (resets play state and duration so the new wavesurfer starts fresh)
+  // Handle URL/Blob change (resets play state and duration so the new wavesurfer starts fresh)
   useEffect(() => {
     if (!wavesurfer.current) return;
     // WaveSurfer.load()/empty() reset internal playback state, but our ref
     // would otherwise stale-claim the new instance is "playing". Reset it.
     isWsPlayingRef.current = false;
     setDuration(0);
-    if (url) {
-      setIsReady(false);
+    
+    // Always clear the old buffer before loading a new one so it doesn't accidentally
+    // play the old track if the new one fails to load!
+    wavesurfer.current.empty();
+    setIsReady(false);
+
+    if (options?.blob) {
+      // Bypasses fetch() entirely, which is much more robust for user-uploaded blobs
+      wavesurfer.current.loadBlob(options.blob).catch(err => {
+        console.warn('WaveSurfer loadBlob failed:', err);
+        setIsReady(true);
+      });
+    } else if (url) {
+      // Fallback for real URLs (like the default example.mp3)
       wavesurfer.current.load(url).catch(err => {
         console.warn('WaveSurfer load failed:', err);
         setIsReady(true);
       });
-    } else {
-      wavesurfer.current.empty();
-      setIsReady(false);
     }
-  }, [url]);
+  }, [url, options?.blob]);
 
   // Sync volume and mute
   useEffect(() => {

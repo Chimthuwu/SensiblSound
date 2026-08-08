@@ -8,7 +8,7 @@ export function BackingTrack() {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { backingTrack, setBackingTrack, bpm, setBackingTrackDurationMs } = useSessionStore();
-  const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, backingTrack?.url);
+  const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, backingTrack?.url, { blob: backingTrack?.blob });
   const [isDragging, setIsDragging] = useState(false);
 
   // Feed the decoded duration back into the store — the vocal-layer timeline
@@ -26,8 +26,10 @@ export function BackingTrack() {
     const file = e.target.files?.[0];
     if (file && (file.type === 'audio/mpeg' || file.type === 'audio/wav' || file.name.endsWith('.mp3') || file.name.endsWith('.wav'))) {
       const url = URL.createObjectURL(file);
-      setBackingTrack({ id: crypto.randomUUID(), name: file.name, url });
+      setBackingTrack({ id: crypto.randomUUID(), name: file.name, url, blob: file });
     }
+    // Reset input so the same file can be selected again
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -46,7 +48,7 @@ export function BackingTrack() {
     const file = e.dataTransfer.files?.[0];
     if (file && (file.type === 'audio/mpeg' || file.type === 'audio/wav' || file.name.endsWith('.mp3') || file.name.endsWith('.wav'))) {
       const url = URL.createObjectURL(file);
-      setBackingTrack({ id: crypto.randomUUID(), name: file.name, url });
+      setBackingTrack({ id: crypto.randomUUID(), name: file.name, url, blob: file });
     }
   };
 
