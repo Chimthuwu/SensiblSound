@@ -1,0 +1,74 @@
+import { useCallback, useEffect, useState } from 'react';
+
+// Cinematic boot sequence: the app icon blooms out of the dark, settles, and
+// the whole overlay dissolves into the studio. Kept deliberately short — this
+// plays on every open, so anything longer than a couple of seconds turns from
+// "nice touch" into "thing she has to sit through".
+const HOLD_MS = 2200;      // time before the overlay starts dissolving
+const FADE_OUT_MS = 600;   // dissolve duration (must match .intro-overlay transition)
+
+export function IntroSplash() {
+  // `leaving` starts the dissolve; `gone` unmounts the overlay entirely so it
+  // can never swallow clicks meant for the transport underneath.
+  const [leaving, setLeaving] = useState(false);
+  const [gone, setGone] = useState(false);
+
+  const dismiss = useCallback(() => setLeaving(true), []);
+
+  // Anyone who'd rather not have motion thrown at them skips straight past it.
+  useEffect(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      setGone(true);
+      return;
+    }
+
+    const holdTimer = window.setTimeout(dismiss, HOLD_MS);
+    return () => window.clearTimeout(holdTimer);
+  }, [dismiss]);
+
+  // Let her cut the intro short with a click or any key — an intro you can't
+  // skip gets old fast when you're reopening the app to record a quick idea.
+  useEffect(() => {
+    if (gone) return;
+    window.addEventListener('keydown', dismiss);
+    window.addEventListener('pointerdown', dismiss);
+    return () => {
+      window.removeEventListener('keydown', dismiss);
+      window.removeEventListener('pointerdown', dismiss);
+    };
+  }, [dismiss, gone]);
+
+  useEffect(() => {
+    if (!leaving) return;
+    const removeTimer = window.setTimeout(() => setGone(true), FADE_OUT_MS);
+    return () => window.clearTimeout(removeTimer);
+  }, [leaving]);
+
+  if (gone) return null;
+
+  return (
+    <div
+      className={`intro-overlay ${leaving ? 'intro-overlay--leaving' : ''}`}
+      role="presentation"
+      aria-hidden="true"
+    >
+      {/* Purple bloom behind everything, so the icon reads as lit rather than pasted on. */}
+      <div className="intro-bloom" />
+
+      <div className="intro-stage">
+        {/* Two rings expanding out of the icon on a stagger — the "power on" pulse. */}
+        <div className="intro-ring" />
+        <div className="intro-ring intro-ring--delayed" />
+
+        <div className="intro-icon-frame">
+          <img src="/ICON.png" alt="" className="intro-icon" draggable={false} />
+          {/* Specular sweep across the artwork once it's settled. */}
+          <div className="intro-shine" />
+        </div>
+
+        <p className="intro-tagline">Made for Sensimilliea 💜</p>
+      </div>
+    </div>
+  );
+}
