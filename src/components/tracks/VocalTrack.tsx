@@ -402,13 +402,16 @@ export function VocalTrack() {
   };
 
   return (
-    <section className="bg-surface rounded-2xl p-5 flex flex-col gap-5 shadow-xl shadow-black/40 relative overflow-hidden">
+    <section className="bg-surface rounded-2xl p-3 md:p-5 flex flex-col gap-3 md:gap-5 shadow-xl shadow-black/40 border border-primary/5 relative overflow-hidden group">
+      
+      {/* Background Studio Glow Effect */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 group-hover:bg-primary/10 transition-colors duration-1000" />
+
+      {activeTake && !isRecording && (
+        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent shadow-[0_0_15px_rgba(168,85,247,0.3)] z-20" />
+      )}
       {isRecording && (
-        <motion.div 
-          className="absolute inset-0 bg-primary/5 pointer-events-none"
-          animate={{ opacity: [0.2, 0.4, 0.2] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-        />
+        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-red-500/80 to-transparent shadow-[0_0_20px_rgba(239,68,68,0.6)] animate-pulse z-20" />
       )}
       
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between relative z-10 gap-3">
@@ -467,10 +470,10 @@ export function VocalTrack() {
         </div>
       </div>
       
-      <div className={`h-32 rounded-xl border relative overflow-hidden flex items-center justify-center transition-all duration-300 ${
+      <div className={`h-24 md:h-28 bg-black/50 rounded-xl relative overflow-hidden flex items-center justify-center transition-all duration-300 border ${
         isRecording 
-          ? 'bg-primary/5 border-primary shadow-[0_0_15px_rgba(168,85,247,0.1)]' 
-          : 'bg-black/50 border-white/[0.05] hover:border-primary/20 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]'
+          ? 'border-red-500/30 shadow-[inset_0_0_20px_rgba(239,68,68,0.15)] bg-red-950/20' 
+          : 'border-white/5 hover:border-primary/20 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]'
       }`}>
         
         {/* Bar-numbered DAW grid, bpm-synced to the take's own decoded length —
