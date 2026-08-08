@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
+import { isDriveConfigured } from '../lib/googleDrive';
 
 export const useSessionStore = create<SessionState>((set) => ({
   bpm: 120,
@@ -17,6 +18,11 @@ export const useSessionStore = create<SessionState>((set) => ({
   metronomeVolume: 0.5,
   backupStatus: 'idle',
   cloudBackupStatus: 'idle',
+  driveBackupStatus: 'idle',
+  // Seeded from whether this build has a client id at all, so the UI can
+  // hide the Drive controls entirely rather than offering a button that
+  // could only ever fail.
+  driveConnection: isDriveConfigured ? 'disconnected' : 'unavailable',
   isMonitoring: true,
   fxEnabled: false,
   transportTimeMs: 0,
@@ -72,6 +78,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   setBackupStatus: (backupStatus) => set({ backupStatus }),
 
   setCloudBackupStatus: (cloudBackupStatus) => set({ cloudBackupStatus }),
+
+  setDriveBackupStatus: (driveBackupStatus) => set({ driveBackupStatus }),
+
+  setDriveConnection: (driveConnection) => set({ driveConnection }),
 
   setIsMonitoring: (isMonitoring) => set({ isMonitoring }),
 

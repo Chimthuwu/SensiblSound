@@ -110,21 +110,30 @@ export function useAudioRecorder() {
         const id = crypto.randomUUID();
         setActiveTake({ id, url, timestamp: Date.now(), transportStartMs, mimeType });
 
-        // Trigger Backup Process — local (IndexedDB) and cloud (Firebase
-        // Storage) are independent, both real, and reported honestly.
+        // Trigger Backup Process — local (IndexedDB), cloud (Firebase
+        // Storage) and Google Drive are independent, all real, and reported
+        // honestly. Drive only shows "uploading" when it's actually
+        // connected, so an unconnected Drive never flickers a status it
+        // isn't going to deliver on.
+        const driveConnected = useSessionStore.getState().driveConnection === 'connected';
         useSessionStore.getState().setBackupStatus('uploading');
         useSessionStore.getState().setCloudBackupStatus('uploading');
-        const { localSaved, cloudSaved } = await backupService.backupTake(id, url);
+        if (driveConnected) useSessionStore.getState().setDriveBackupStatus('uploading');
+
+        const { localSaved, cloudSaved, drive } = await backupService.backupTake(id, url);
         useSessionStore.getState().setBackupStatus(localSaved ? 'success' : 'failed');
         useSessionStore.getState().setCloudBackupStatus(cloudSaved ? 'success' : 'failed');
+        useSessionStore.getState().setDriveBackupStatus(
+          drive === 'saved' ? 'success' : drive === 'failed' ? 'failed' : 'skipped'
+        );
 
         // Only add to the recoverable-history list if a durable copy
-        // actually exists somewhere — an entry that neither backup ever
+        // actually exists somewhere — an entry that no backup ever
         // reaches would just be a dead link in the Recordings panel later.
         // This runs regardless of what she does next (Keep as Layer /
         // Record Again / just closing the tab), so a discarded take is
         // still recoverable from the Recordings panel.
-        if (localSaved || cloudSaved) {
+        if (localSaved || cloudSaved || drive === 'saved') {
           useSessionStore.getState().addRecordingHistoryEntry({ id, timestamp: Date.now(), transportStartMs, mimeType });
         }
       };
