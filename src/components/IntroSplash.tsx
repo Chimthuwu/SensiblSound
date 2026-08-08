@@ -4,28 +4,28 @@ import { useCallback, useEffect, useState } from 'react';
 // the whole overlay dissolves into the studio. Kept deliberately short — this
 // plays on every open, so anything longer than a couple of seconds turns from
 // "nice touch" into "thing she has to sit through".
-const HOLD_MS = 2200;      // time before the overlay starts dissolving
-const FADE_OUT_MS = 600;   // dissolve duration (must match .intro-overlay transition)
+const HOLD_MS = 2200;         // time before the overlay starts dissolving
+const REDUCED_HOLD_MS = 1400; // shorter hold when there's no animation to watch
+const FADE_OUT_MS = 600;      // dissolve duration (must match .intro-overlay transition)
 
 export function IntroSplash() {
   // `leaving` starts the dissolve; `gone` unmounts the overlay entirely so it
   // can never swallow clicks meant for the transport underneath.
   const [leaving, setLeaving] = useState(false);
   const [gone, setGone] = useState(false);
+  // Reduced motion means *less motion*, not *no intro* — the icon still shows,
+  // it just cross-fades instead of flying in. Read during render (not in an
+  // effect) so the very first painted frame is already the right variant.
+  const [reduced] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 
   const dismiss = useCallback(() => setLeaving(true), []);
 
-  // Anyone who'd rather not have motion thrown at them skips straight past it.
   useEffect(() => {
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) {
-      setGone(true);
-      return;
-    }
-
-    const holdTimer = window.setTimeout(dismiss, HOLD_MS);
+    const holdTimer = window.setTimeout(dismiss, reduced ? REDUCED_HOLD_MS : HOLD_MS);
     return () => window.clearTimeout(holdTimer);
-  }, [dismiss]);
+  }, [dismiss, reduced]);
 
   // Let her cut the intro short with a click or any key — an intro you can't
   // skip gets old fast when you're reopening the app to record a quick idea.
@@ -49,7 +49,11 @@ export function IntroSplash() {
 
   return (
     <div
-      className={`intro-overlay ${leaving ? 'intro-overlay--leaving' : ''}`}
+      className={[
+        'intro-overlay',
+        leaving ? 'intro-overlay--leaving' : '',
+        reduced ? 'intro-overlay--reduced' : '',
+      ].join(' ')}
       role="presentation"
       aria-hidden="true"
     >
