@@ -57,6 +57,7 @@ export function IntroSplash() {
       role="presentation"
       aria-hidden="true"
     >
+      <div className="intro-bg-grid" />
       {/* Purple bloom behind everything, so the icon reads as lit rather than pasted on. */}
       <div className="intro-bloom" />
 
@@ -68,6 +69,8 @@ export function IntroSplash() {
           {/* Two rings expanding out of the icon on a stagger — the "power on" pulse. */}
           <div className="intro-ring" />
           <div className="intro-ring intro-ring--delayed" />
+          <div className="intro-ring intro-ring--dashed" />
+          
           {/* Slowly rotating conic halo — keeps the frame alive while it holds. */}
           <div className="intro-halo" />
 
