@@ -225,7 +225,7 @@ function App() {
       </main>
 
       {/* Transport Controls (Bottom Bar) */}
-      <footer className="h-24 border-t border-white/[0.04] bg-[#0c0c0e]/95 backdrop-blur-md flex items-center justify-between px-12 relative z-20">
+      <footer className="sticky bottom-0 mt-auto h-24 border-t border-white/[0.04] bg-[#0c0c0e]/95 backdrop-blur-md flex items-center justify-between px-12 z-40">
         
         {/* Left Side: BPM & Metronome */}
         <div className="flex items-center gap-6 w-1/3">
