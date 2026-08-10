@@ -25,7 +25,7 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
   const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
     containerRef,
     layer.url,
-    { startOffsetMs: layer.transportStartMs, interactive: false }
+    { startOffsetMs: layer.transportStartMs, interactive: true }
   );
 
   useEffect(() => {

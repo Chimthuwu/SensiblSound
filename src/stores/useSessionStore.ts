@@ -30,6 +30,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   // what makes recordings recoverable after a refresh even though
   // activeTake/layers themselves reset to empty.
   recordingsHistory: recordingHistoryIndex.list(),
+  mutedTracks: new Set(),
+  soloedTracks: new Set(),
   fxSettings: {
     autotuneEnabled: false,
     compressorEnabled: false,
@@ -131,5 +133,25 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   addRecordingHistoryEntry: (entry) => set({
     recordingsHistory: recordingHistoryIndex.add(entry)
+  }),
+
+  toggleMuteTrack: (trackId) => set((state) => {
+    const newMuted = new Set(state.mutedTracks);
+    if (newMuted.has(trackId)) {
+      newMuted.delete(trackId);
+    } else {
+      newMuted.add(trackId);
+    }
+    return { mutedTracks: newMuted };
+  }),
+
+  toggleSoloTrack: (trackId) => set((state) => {
+    const newSoloed = new Set(state.soloedTracks);
+    if (newSoloed.has(trackId)) {
+      newSoloed.delete(trackId);
+    } else {
+      newSoloed.add(trackId);
+    }
+    return { soloedTracks: newSoloed };
   }),
 }));

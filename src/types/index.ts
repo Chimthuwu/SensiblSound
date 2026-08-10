@@ -81,6 +81,8 @@ export interface SessionState {
   fxSettings: FxSettings;
   transportTimeMs: number; // Project playhead position in ms
   recordingsHistory: RecordingMeta[]; // Every recording ever made this browser, independent of the active session
+  mutedTracks: Set<string>;
+  soloedTracks: Set<string>;
 
   // Actions
   setBpm: (bpm: number) => void;
@@ -108,4 +110,6 @@ export interface SessionState {
   markActiveTakeDownloaded: () => void;
   markLayerDownloaded: (id: string) => void;
   addRecordingHistoryEntry: (entry: RecordingMeta) => void;
+  toggleMuteTrack: (trackId: string) => void;
+  toggleSoloTrack: (trackId: string) => void;
 }
