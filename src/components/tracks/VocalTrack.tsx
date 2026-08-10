@@ -78,8 +78,10 @@ function RealtimeWaveform({ stream, isRecording }: RealtimeWaveformProps) {
         let hasClipped = false;
 
         for (let i = 0; i < bufferLength; i++) {
-          const v = dataArray[i] / 128.0;
-          const y = (v * rect.height) / 2;
+          const normalized = (dataArray[i] - 128) / 128.0;
+          const amplified = normalized * 3.5; // Amplify the signal heavily
+          const clamped = Math.max(-1, Math.min(1, amplified));
+          const y = (clamped + 1) * (rect.height / 2);
 
           if (dataArray[i] <= 1 || dataArray[i] >= 254) {
             hasClipped = true;
