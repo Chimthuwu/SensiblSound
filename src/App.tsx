@@ -248,69 +248,50 @@ function App() {
       </main>
 
       {/* Transport Controls (Bottom Bar) */}
-      <footer className="sticky bottom-0 mt-auto border-t border-white/[0.04] bg-[#0c0c0e]/95 backdrop-blur-md flex flex-col md:flex-row items-center justify-between px-3 md:px-12 z-40 py-3 md:py-0 md:h-24 gap-3 md:gap-0">
+      <footer className="sticky bottom-0 mt-auto border-t border-white/[0.04] bg-[#0c0c0e]/95 backdrop-blur-md flex flex-col md:flex-row items-center justify-between px-3 md:px-12 z-40 py-3 md:py-2 gap-3 md:gap-0">
         
-        {/* Mobile-only Scrubber Row */}
-        <div className="w-full md:hidden flex items-center gap-3">
-          <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Transport</span>
-          <input
-            type="range"
-            min="0"
-            max={TRANSPORT_MAX_MS}
-            step={50}
-            value={Math.min(transportTimeMs, TRANSPORT_MAX_MS)}
-            onChange={(e) => setTransportTimeMs(parseInt(e.target.value, 10))}
-            className="flex-1 accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-          />
-          <div className="text-sm font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)]">
-            {formattedTime}
+        {/* Left Side: BPM & Metronome */}
+        <div className="flex items-center justify-start gap-3 md:gap-6 w-full md:w-1/3">
+          {/* BPM */}
+          <div className="flex flex-col">
+            <span className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-wider hidden md:block">Tempo</span>
+            <div className="flex items-baseline gap-0.5 md:gap-1 mt-0.5">
+              <input 
+                type="number" 
+                value={bpm}
+                onChange={(e) => setBpm(Number(e.target.value) || 120)}
+                className="w-10 md:w-16 bg-transparent text-lg md:text-2xl font-bold font-mono text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="text-[9px] md:text-[10px] text-zinc-500 font-semibold tracking-wider uppercase font-mono">BPM</span>
+            </div>
+          </div>
+          
+          <div className="h-6 md:h-8 w-[1px] bg-white/[0.08]" />
+          
+          <div className="flex flex-col gap-1 md:gap-1.5">
+            <div className="flex items-center gap-2 md:gap-3">
+              <button 
+                onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
+                className={`text-[9px] md:text-[10px] font-bold tracking-wider px-1.5 md:px-2 py-0.5 rounded transition-all duration-300 cursor-pointer ${
+                  isMetronomeEnabled ? 'bg-primary/20 text-primary border border-primary/25' : 'bg-white/[0.02] border border-white/[0.05] text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                CLICK
+              </button>
+              <input 
+                type="range" 
+                min="0" max="1" step="0.01" 
+                value={metronomeVolume}
+                onChange={(e) => setMetronomeVolume(parseFloat(e.target.value))}
+                className="w-12 md:w-20 accent-primary opacity-60 hover:opacity-100 transition-opacity cursor-pointer hidden md:block"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Mobile Bottom Row Container */}
-        <div className="w-full md:w-auto flex items-center justify-between md:contents gap-2">
-          
-          {/* Left Side: BPM & Metronome */}
-          <div className="flex items-center gap-3 md:gap-6 md:w-1/3">
-            {/* BPM */}
-            <div className="flex flex-col">
-              <span className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-wider hidden md:block">Tempo</span>
-              <div className="flex items-baseline gap-0.5 md:gap-1 mt-0.5">
-                <input 
-                  type="number" 
-                  value={bpm}
-                  onChange={(e) => setBpm(Number(e.target.value) || 120)}
-                  className="w-10 md:w-16 bg-transparent text-lg md:text-2xl font-bold font-mono text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-                <span className="text-[9px] md:text-[10px] text-zinc-500 font-semibold tracking-wider uppercase font-mono">BPM</span>
-              </div>
-            </div>
-            
-            <div className="h-6 md:h-8 w-[1px] bg-white/[0.08]" />
-            
-            <div className="flex flex-col gap-1 md:gap-1.5">
-              <div className="flex items-center gap-2 md:gap-3">
-                <button 
-                  onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
-                  className={`text-[9px] md:text-[10px] font-bold tracking-wider px-1.5 md:px-2 py-0.5 rounded transition-all duration-300 cursor-pointer ${
-                    isMetronomeEnabled ? 'bg-primary/20 text-primary border border-primary/25' : 'bg-white/[0.02] border border-white/[0.05] text-zinc-500 hover:text-zinc-300'
-                  }`}
-                >
-                  CLICK
-                </button>
-                <input 
-                  type="range" 
-                  min="0" max="1" step="0.01" 
-                  value={metronomeVolume}
-                  onChange={(e) => setMetronomeVolume(parseFloat(e.target.value))}
-                  className="w-12 md:w-20 accent-primary opacity-60 hover:opacity-100 transition-opacity cursor-pointer hidden md:block"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Center: Core Transport Controls */}
-          <div className="flex items-center justify-end md:justify-center gap-2 md:gap-4 md:w-1/3">
+        {/* Center: Core Transport Controls + Scrubber */}
+        <div className="flex flex-col items-center justify-center gap-2 w-full md:w-1/3">
+          <div className="flex items-center justify-center gap-2 md:gap-4">
             <button
               className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border bg-white/[0.03] text-zinc-300 border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.1] hover:scale-105"
               onClick={rewindTransport}
@@ -343,13 +324,9 @@ function App() {
                {isRecording ? <Square size={16} fill="currentColor" /> : <Circle size={20} fill="currentColor" />}
             </button>
           </div>
-
-        </div>
-
-        {/* Desktop-only: Transport Scrub + Timecode */}
-        <div className="hidden md:flex flex-col items-end gap-1.5 w-1/3">
-          <div className="flex items-center gap-3 mr-1">
-            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Transport</span>
+          
+          <div className="flex items-center gap-3 w-full max-w-sm justify-center">
+            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider hidden md:block">Transport</span>
             <input
               type="range"
               min="0"
@@ -357,15 +334,23 @@ function App() {
               step={50}
               value={Math.min(transportTimeMs, TRANSPORT_MAX_MS)}
               onChange={(e) => setTransportTimeMs(parseInt(e.target.value, 10))}
-              className="w-56 accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+              className="flex-1 accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
               title="Scrub transport position"
             />
+            <div className="text-[11px] md:hidden font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)]">
+              {formattedTime}
+            </div>
           </div>
+        </div>
+
+        {/* Right: Timecode (Desktop only) */}
+        <div className="hidden md:flex flex-col items-end justify-center w-1/3">
           <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mr-1">Timecode</span>
-          <div className="text-4xl font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)] selection:bg-transparent select-none mt-0.5">
+          <div className="text-3xl lg:text-4xl font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)] selection:bg-transparent select-none mt-0.5">
             {formattedTime}
           </div>
         </div>
+
       </footer>
     </div>
   );
