@@ -7,8 +7,14 @@ import { TimeRuler } from './TimeRuler';
 export function BackingTrack() {
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { backingTrack, setBackingTrack, bpm, setBackingTrackDurationMs } = useSessionStore();
-  const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, backingTrack?.url, { blob: backingTrack?.blob });
+  const { backingTrack, setBackingTrack, bpm, setBackingTrackDurationMs, mutedTracks, soloedTracks, toggleMuteTrack, toggleSoloTrack } = useSessionStore();
+  const trackId = 'backing';
+  const isGlobalMuted = mutedTracks.has(trackId);
+  const isTrackSoloed = soloedTracks.has(trackId);
+  const isAnyTrackSoloed = soloedTracks.size > 0;
+  const forceMute = isGlobalMuted || (isAnyTrackSoloed && !isTrackSoloed);
+
+  const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, backingTrack?.url, { blob: backingTrack?.blob, forceMute });
   const [isDragging, setIsDragging] = useState(false);
 
   // Feed the decoded duration back into the store — the vocal-layer timeline
@@ -53,17 +59,40 @@ export function BackingTrack() {
   };
 
   return (
-    <section className="bg-surface rounded-2xl p-3 md:p-5 flex flex-col gap-3 md:gap-5 shadow-xl shadow-black/40">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-3">
-        <h2 className="text-sm font-bold text-zinc-400 flex items-center gap-2 tracking-wide font-sans uppercase">
-          <FileAudio size={16} className="text-primary" />
-          Backing Track {backingTrack ? `— ${backingTrack.name}` : ''}
-        </h2>
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+    <section className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group h-32">
+      {/* Left Sidebar */}
+      <div className="w-full md:w-64 p-3 md:p-4 flex flex-col justify-between border-b md:border-b-0 md:border-r border-white/10 bg-[#141416] shrink-0 z-20">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold text-zinc-300 flex items-center gap-2 tracking-wide font-sans truncate">
+            <FileAudio size={14} className="text-primary shrink-0" />
+            <span className="truncate">{backingTrack ? backingTrack.name : 'Backing Track'}</span>
+          </h2>
+          
+          {/* Mute / Solo */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button 
+              onClick={() => toggleMuteTrack(trackId)} 
+              className={`w-6 h-6 flex items-center justify-center rounded font-bold text-[9px] transition-colors cursor-pointer ${isGlobalMuted ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-black/30 text-zinc-400 border border-white/5 hover:text-white'}`}
+              title="Mute Track"
+            >
+              M
+            </button>
+            <button 
+              onClick={() => toggleSoloTrack(trackId)} 
+              className={`w-6 h-6 flex items-center justify-center rounded font-bold text-[9px] transition-colors cursor-pointer ${isTrackSoloed ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-black/30 text-zinc-400 border border-white/5 hover:text-white'}`}
+              title="Solo Track"
+            >
+              S
+            </button>
+          </div>
+        </div>
+
+        {/* Volume & Controls */}
+        <div className="flex flex-col gap-2 mt-2">
           {backingTrack && (
-            <div className="flex items-center gap-2 text-zinc-400 bg-black/30 px-3 py-1.5 rounded-lg border border-white/[0.03]">
-              <button onClick={() => setIsMuted(!isMuted)} className="hover:text-white transition-colors cursor-pointer">
-                {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            <div className="flex items-center gap-2 text-zinc-400 bg-black/40 px-2 py-1 rounded-md border border-white/[0.03]">
+              <button onClick={() => setIsMuted(!isMuted)} className="hover:text-white transition-colors cursor-pointer shrink-0">
+                {isMuted || volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
               </button>
               <input 
                 type="range" 
@@ -75,43 +104,49 @@ export function BackingTrack() {
                   setIsMuted(false);
                   setVolume(parseFloat(e.target.value));
                 }}
-                className="w-16 md:w-20 accent-primary cursor-pointer"
+                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-full appearance-none"
               />
             </div>
           )}
-          {backingTrack && (
-            <button 
-              onClick={() => setBackingTrack(undefined)}
-              className="text-xs bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-200 border border-red-500/20 px-3 py-1.5 rounded-md transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Trash2 size={13} />
-              Clear
-            </button>
-          )}
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200"
-          >
-            {backingTrack ? 'Replace Audio' : 'Import Audio'}
-          </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            accept="audio/mpeg, audio/wav, .mp3, .wav" 
-            className="hidden" 
-          />
+          
+          <div className="flex items-center gap-2">
+            {!backingTrack ? (
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full text-[10px] bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-2 py-1 rounded transition-all cursor-pointer font-sans font-semibold text-zinc-300"
+              >
+                Import Audio
+              </button>
+            ) : (
+              <button 
+                onClick={() => setBackingTrack(undefined)}
+                className="w-full text-[10px] bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-200 border border-red-500/20 px-2 py-1 rounded transition-colors flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <Trash2 size={12} />
+                Clear
+              </button>
+            )}
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileChange} 
+              accept="audio/mpeg, audio/wav, .mp3, .wav" 
+              className="hidden" 
+            />
+          </div>
         </div>
       </div>
       
+      {/* Right Waveform */}
       <div 
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`h-28 bg-black/50 rounded-xl border relative overflow-hidden flex items-center justify-center transition-all duration-300 ${
+        className={`flex-1 relative overflow-hidden transition-all duration-300 ${
+
           isDragging 
-            ? 'border-primary bg-primary/5 shadow-[inset_0_0_12px_rgba(168,85,247,0.15)]' 
-            : 'border-dashed border-white/10 hover:border-primary/30 hover:bg-black/60 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]'
+            ? 'border-l-primary bg-primary/5 shadow-[inset_0_0_12px_rgba(168,85,247,0.15)]' 
+            : 'hover:bg-black/20 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)] bg-[#1a1a1c]'
         }`}
       >
         {/* DAW Gridlines */}

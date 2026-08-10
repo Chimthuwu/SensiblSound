@@ -6,15 +6,16 @@ import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { TimeRuler } from './TimeRuler';
 import { LayerTrack } from './LayerTrack';
-import { Playhead } from './Playhead';
+
 import { getLayerTimelineDurationMs } from '../../utils/timeline';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 
 interface RealtimeWaveformProps {
   stream: MediaStream;
+  isRecording: boolean;
 }
 
-function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
+function RealtimeWaveform({ stream, isRecording }: RealtimeWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -67,9 +68,9 @@ function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
 
         // Draw waveform
         ctx.lineWidth = 2;
-        ctx.strokeStyle = '#a855f7'; // Neon purple
+        ctx.strokeStyle = isRecording ? '#ef4444' : '#a855f7'; // Neon red if recording, purple if monitoring
         ctx.shadowBlur = 6;
-        ctx.shadowColor = 'rgba(168, 85, 247, 0.6)';
+        ctx.shadowColor = isRecording ? 'rgba(239, 68, 68, 0.6)' : 'rgba(168, 85, 247, 0.6)';
         ctx.beginPath();
 
         const sliceWidth = rect.width / bufferLength;
@@ -129,7 +130,7 @@ function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
       if (analyser) analyser.disconnect();
       if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
     };
-  }, [stream]);
+  }, [stream, isRecording]);
 
   return <canvas ref={canvasRef} className="w-full h-full absolute inset-0 rounded-xl" />;
 }
@@ -137,11 +138,18 @@ function RealtimeWaveform({ stream }: RealtimeWaveformProps) {
 export function VocalTrack() {
   const {
     isRecording, activeTake, setActiveTake, layers, addLayer, removeLayer,
-    isMonitoring, setIsMonitoring, fxEnabled, fxSettings, bpm, setActiveTakeDurationMs,
+    isMonitoring, setIsMonitoring, bpm, setActiveTakeDurationMs,
     markActiveTakeDownloaded
   } = useSessionStore();
   const layersTimelineDurationMs = useSessionStore(getLayerTimelineDurationMs);
   const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady, stream } = useAudioRecorder();
+
+  const trackId = 'active_take';
+  const isGlobalMuted = useSessionStore(state => state.mutedTracks).has(trackId);
+  const isTrackSoloed = useSessionStore(state => state.soloedTracks).has(trackId);
+  const isAnyTrackSoloed = useSessionStore(state => state.soloedTracks).size > 0;
+  const forceMute = isGlobalMuted || (isAnyTrackSoloed && !isTrackSoloed);
+  const { toggleMuteTrack, toggleSoloTrack } = useSessionStore();
 
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -151,7 +159,7 @@ export function VocalTrack() {
   const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
     containerRef,
     activeTake?.url,
-    { startOffsetMs: activeTake?.transportStartMs ?? 0, interactive: true, blob: activeTake?.blob }
+    { startOffsetMs: activeTake?.transportStartMs ?? 0, interactive: true, blob: activeTake?.blob, forceMute }
   );
 
   // Depend on activeTake?.id (stable) rather than the object itself — the
@@ -179,79 +187,103 @@ export function VocalTrack() {
   };
 
   return (
-    <section className="bg-surface rounded-2xl p-3 md:p-5 flex flex-col gap-3 md:gap-5 shadow-xl shadow-black/40 border border-primary/5 relative overflow-hidden group">
-      
-      {/* Background Studio Glow Effect */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 group-hover:bg-primary/10 transition-colors duration-1000" />
+    <section className="flex flex-col gap-1 w-full">
+      <div className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group h-32">
+        {/* Background Studio Glow Effect */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 group-hover:bg-primary/10 transition-colors duration-1000" />
 
-      {activeTake && !isRecording && (
-        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent shadow-[0_0_15px_rgba(168,85,247,0.3)] z-20" />
-      )}
-      {isRecording && (
-        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-red-500/80 to-transparent shadow-[0_0_20px_rgba(239,68,68,0.6)] animate-pulse z-20" />
-      )}
-      
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between relative z-10 gap-3">
-        <h2 className="text-sm font-bold text-primary flex items-center gap-2 tracking-wide font-sans uppercase">
-          <Mic2 size={16} />
-          Vocal Take
-        </h2>
+        {activeTake && !isRecording && (
+          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent shadow-[0_0_15px_rgba(168,85,247,0.3)] z-20" />
+        )}
+        {isRecording && (
+          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-red-500/80 to-transparent shadow-[0_0_20px_rgba(239,68,68,0.6)] animate-pulse z-20" />
+        )}
         
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {activeTake && !isRecording && (
-            <div className="flex items-center gap-2 text-zinc-400 bg-black/30 px-3 py-1.5 rounded-lg border border-white/[0.03]">
-              <button onClick={() => setIsMuted(!isMuted)} className="hover:text-primary transition-colors cursor-pointer">
-                {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+        {/* Left Sidebar */}
+        <div className="w-full md:w-64 p-3 md:p-4 flex flex-col justify-between border-b md:border-b-0 md:border-r border-white/10 bg-[#141416] shrink-0 z-20 relative">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold text-primary flex items-center gap-2 tracking-wide font-sans uppercase">
+              <Mic2 size={14} />
+              Vocal Take
+            </h2>
+            
+            {/* Mute / Solo */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button 
+                onClick={() => toggleMuteTrack(trackId)} 
+                className={`w-6 h-6 flex items-center justify-center rounded font-bold text-[9px] transition-colors cursor-pointer ${isGlobalMuted ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-black/30 text-zinc-400 border border-white/5 hover:text-white'}`}
+                title="Mute Track"
+              >
+                M
               </button>
-              <input 
-                type="range" 
-                min="0" 
-                max="1" 
-                step="0.01" 
-                value={isMuted ? 0 : volume}
-                onChange={(e) => {
-                  setIsMuted(false);
-                  setVolume(parseFloat(e.target.value));
-                }}
-                className="w-16 md:w-20 accent-primary cursor-pointer"
-              />
+              <button 
+                onClick={() => toggleSoloTrack(trackId)} 
+                className={`w-6 h-6 flex items-center justify-center rounded font-bold text-[9px] transition-colors cursor-pointer ${isTrackSoloed ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-black/30 text-zinc-400 border border-white/5 hover:text-white'}`}
+                title="Solo Track"
+              >
+                S
+              </button>
             </div>
-          )}
+          </div>
           
-          <button
-            onClick={() => setIsMonitoring(!isMonitoring)}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-all duration-300 flex items-center justify-center gap-1.5 cursor-pointer font-sans font-semibold ${
-              isMonitoring 
-                ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' 
-                : 'bg-white/[0.04] text-zinc-400 border-white/[0.05] hover:text-white hover:bg-white/[0.08]'
-            }`}
-            title="Listen to your mic input in real-time with FX applied"
-          >
-            <Activity size={14} className={isMonitoring ? 'animate-pulse' : ''} />
-            {isMonitoring ? 'Monitoring ON' : 'Monitor Mic'}
-          </button>
+          <div className="flex flex-col gap-2 mt-2">
+            {activeTake && !isRecording && (
+              <div className="flex items-center gap-2 text-zinc-400 bg-black/40 px-2 py-1 rounded-md border border-white/[0.03]">
+                <button onClick={() => setIsMuted(!isMuted)} className="hover:text-primary transition-colors cursor-pointer shrink-0">
+                  {isMuted || volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                </button>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.01" 
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => {
+                    setIsMuted(false);
+                    setVolume(parseFloat(e.target.value));
+                  }}
+                  className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-full appearance-none"
+                />
+              </div>
+            )}
+            
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsMonitoring(!isMonitoring)}
+                className={`flex-1 text-[10px] px-2 py-1 rounded border transition-all duration-300 flex items-center justify-center gap-1 cursor-pointer font-sans font-semibold ${
+                  isMonitoring 
+                    ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' 
+                    : 'bg-white/[0.04] text-zinc-400 border-white/[0.05] hover:text-white hover:bg-white/[0.08]'
+                }`}
+                title="Listen to your mic input in real-time with FX applied"
+              >
+                <Activity size={12} className={isMonitoring ? 'animate-pulse' : ''} />
+                {isMonitoring ? 'Monitoring' : 'Monitor'}
+              </button>
 
-          <select 
-            value={selectedDeviceId}
-            onChange={(e) => setSelectedDeviceId(e.target.value)}
-            disabled={isRecording || !micReady}
-            className="text-xs bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-zinc-300 outline-none focus:border-primary/50 transition-all cursor-pointer font-sans w-full md:w-auto"
-          >
-            {!micReady && <option value="">Requesting mic access...</option>}
-            {devices.map(device => (
-              <option key={device.deviceId} value={device.deviceId}>
-                {device.label || `Microphone ${device.deviceId.slice(0, 5)}...`}
-              </option>
-            ))}
-          </select>
+              <select 
+                value={selectedDeviceId}
+                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                disabled={isRecording || !micReady}
+                className="flex-1 text-[10px] bg-black/40 border border-white/10 rounded px-1 py-1 text-zinc-300 outline-none focus:border-primary/50 transition-all cursor-pointer font-sans max-w-[50%]"
+              >
+                {!micReady && <option value="">Req mic...</option>}
+                {devices.map(device => (
+                  <option key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Mic ${device.deviceId.slice(0, 5)}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
-      </div>
-      
-      <div className={`h-24 md:h-28 bg-black/50 rounded-xl relative overflow-hidden flex items-center justify-center transition-all duration-300 border ${
-        isRecording 
-          ? 'border-red-500/30 shadow-[inset_0_0_20px_rgba(239,68,68,0.15)] bg-red-950/20' 
-          : 'border-white/5 hover:border-primary/20 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)]'
-      }`}>
+        
+        {/* Right Waveform / Oscilloscope */}
+        <div className={`flex-1 relative overflow-hidden transition-all duration-300 border-l border-white/5 ${
+          isRecording 
+            ? 'shadow-[inset_0_0_20px_rgba(239,68,68,0.15)] bg-red-950/20' 
+            : 'hover:bg-black/20 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)] bg-[#1a1a1c]'
+        }`}>
         
         {/* Bar-numbered DAW grid, bpm-synced to the take's own decoded length —
             same TimeRuler the backing track uses, so bar numbers here mean the
@@ -278,18 +310,20 @@ export function VocalTrack() {
           </div>
         )}
 
-        {/* Live Recording State */}
-        {isRecording && (
+        {/* Live Recording/Monitoring State */}
+        {(isRecording || (stream && !activeTake)) && (
           <>
-            {stream && <RealtimeWaveform stream={stream} />}
-            <div className="text-primary text-sm z-10 flex flex-col items-center gap-3 bg-black/40 px-4 py-3 rounded-xl border border-white/[0.03] backdrop-blur-md">
-               <motion.div 
-                 className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]"
-                 animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
-                 transition={{ repeat: Infinity, duration: 1 }}
-               />
-               <span className="font-bold tracking-wider animate-pulse uppercase text-[10px]">RECORDING LIVE</span>
-            </div>
+            {stream && <RealtimeWaveform stream={stream} isRecording={isRecording} />}
+            {isRecording && (
+              <div className="text-primary text-sm z-10 flex flex-col items-center gap-3 bg-black/40 px-4 py-3 rounded-xl border border-white/[0.03] backdrop-blur-md absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                 <motion.div 
+                   className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]"
+                   animate={{ scale: [1, 1.4, 1], opacity: [1, 0.4, 1] }}
+                   transition={{ repeat: Infinity, duration: 1 }}
+                 />
+                 <span className="font-bold tracking-wider animate-pulse uppercase text-[10px]">RECORDING LIVE</span>
+              </div>
+            )}
           </>
         )}
 
@@ -301,13 +335,29 @@ export function VocalTrack() {
           </div>
         )}
       </div>
+    </div>
 
-      {/* Take Management Controls */}
+      {/* Take Management Controls - Sitting Below the Track */}
       {activeTake && !isRecording && (
-        <div className="flex flex-col gap-3 border-t border-white/5 pt-4">
-          {/* Unmissable download CTA — this is the main defense against losing
-              a recording (there is currently no other durable copy anywhere).
-              Pulses with a glow until she's actually downloaded it. */}
+        <div className="flex flex-row items-center gap-3 bg-[#1a1a1c]/80 border border-white/5 p-2 rounded-xl mt-1 w-full justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRecordAgain}
+              className="text-xs text-zinc-400 hover:text-white px-3 py-1.5 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              Record Again
+            </button>
+            <button
+              onClick={() => {
+                addLayer(activeTake);
+                setActiveTake(undefined);
+              }}
+              className="text-xs bg-primary hover:bg-primary/80 text-white font-medium px-3 py-1.5 rounded-md transition-colors cursor-pointer"
+            >
+              Keep as Layer
+            </button>
+          </div>
+          
           <motion.button
             onClick={handleDownloadActiveTake}
             animate={activeTake.downloaded ? {} : {
@@ -318,61 +368,34 @@ export function VocalTrack() {
               ],
             }}
             transition={{ repeat: activeTake.downloaded ? 0 : Infinity, duration: 1.8 }}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl font-bold text-sm tracking-wide transition-colors cursor-pointer ${
+            className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded font-bold text-xs tracking-wide transition-colors cursor-pointer ${
               activeTake.downloaded
-                ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-950/60'
+                ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30'
                 : 'bg-emerald-500 hover:bg-emerald-400 text-black border border-emerald-400'
             }`}
             title="Save this recording as a file on your device"
           >
             {activeTake.downloaded ? (
-              <><Check size={16} /> Downloaded — saved to your device</>
+              <><Check size={14} /> Saved</>
             ) : (
-              <><Download size={18} /> Download This Take Now</>
+              <><Download size={14} /> Download</>
             )}
           </motion.button>
-
-          <div className="flex items-center justify-end gap-3">
-            <button
-              onClick={handleRecordAgain}
-              className="text-xs text-zinc-400 hover:text-white px-4 py-2 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
-            >
-              Record Again
-            </button>
-            <button
-              onClick={() => {
-                addLayer(activeTake);
-                setActiveTake(undefined);
-              }}
-              className="text-xs bg-primary hover:bg-primary/80 text-white font-medium px-4 py-2 rounded-md transition-colors cursor-pointer"
-            >
-              Keep as Layer
-            </button>
-          </div>
         </div>
       )}
 
-      {/* Layers Timeline — stacked DAW-style tracks. All rows share one
-          bpm-synced grid and one playhead (Playhead.tsx) so multiple kept
-          takes visually line up with each other and with the beat, and each
-          row now actually plays back (layers previously had no audio engine
-          wired up at all — they were silent list entries). */}
+      {/* Layers Timeline — stacked DAW-style tracks. */}
       {layers.length > 0 && (
-        <div className="border-t border-white/5 pt-4 flex flex-col gap-3">
-          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Layers ({layers.length}/5)</h3>
-          <div className="relative flex flex-col gap-2.5 pt-4 pb-1">
-            <TimeRuler bpm={bpm} duration={layersTimelineDurationMs / 1000} />
-            <Playhead totalDurationMs={layersTimelineDurationMs} />
-            {layers.map((layer, index) => (
-              <LayerTrack
-                key={layer.id}
-                layer={layer}
-                index={index}
-                totalDurationMs={layersTimelineDurationMs}
-                onRemove={removeLayer}
-              />
-            ))}
-          </div>
+        <div className="flex flex-col gap-1 mt-1">
+          {layers.map((layer, index) => (
+            <LayerTrack
+              key={layer.id}
+              layer={layer}
+              index={index}
+              totalDurationMs={layersTimelineDurationMs}
+              onRemove={removeLayer}
+            />
+          ))}
         </div>
       )}
     </section>
