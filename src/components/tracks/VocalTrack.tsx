@@ -278,19 +278,22 @@ export function VocalTrack() {
               </select>
             </div>
 
-            <div className="mt-2 flex items-center gap-2 px-1" title="Microphone Input Gain">
-              <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider w-8">Gain</span>
-              <input
-                type="range"
-                min="0"
-                max="200"
+            <div className="flex items-center gap-2 text-zinc-400 bg-black/40 px-2 py-1 mt-2 rounded-md border border-white/[0.03]" title="Microphone Input Gain">
+              <button 
+                onClick={() => setFxSettings({ micGain: 100 })} 
+                className="hover:text-white transition-colors cursor-pointer shrink-0"
+                title="Reset Gain"
+              >
+                <Mic2 size={14} />
+              </button>
+              <input 
+                type="range" 
+                min="0" 
+                max="200" 
                 value={fxSettings.micGain ?? 100}
                 onChange={(e) => setFxSettings({ micGain: parseInt(e.target.value) })}
-                className="flex-1 h-1 bg-white/10 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white cursor-pointer"
+                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-full appearance-none"
               />
-              <span className="text-[9px] text-zinc-500 font-medium w-6 text-right">
-                {fxSettings.micGain ?? 100}%
-              </span>
             </div>
           </div>
         </div>
