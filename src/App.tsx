@@ -215,7 +215,7 @@ function App() {
             )}
 
             <a 
-              href="https://github.com/Chimthuwu/SensiblSound/releases/latest"
+              href="https://github.com/Chimthuwu/SensiblSound/releases/download/v1.0.0/Sensi.Soundlabs.Setup.0.0.0.exe"
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0 inline-flex items-center"
@@ -223,7 +223,7 @@ function App() {
               Desktop DL
             </a>
             <a 
-              href="https://github.com/Chimthuwu/SensiblSound/releases/latest"
+              href="https://github.com/Chimthuwu/SensiblSound/releases/download/v1.0.0/SENSI-SOUNDLABS-ANDROID.apk"
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0 inline-flex items-center"
