@@ -26,3 +26,10 @@ dist-ssr
 # Build outputs
 release/
 android/
+electron/
+# Local binaries & environment
+jdk21/
+jdk21.zip
+.env
+.env.*
+todo.md

@@ -21,11 +21,17 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
   const containerRef = useRef<HTMLDivElement>(null);
   const setLayerDurationMs = useSessionStore((s) => s.setLayerDurationMs);
   const markLayerDownloaded = useSessionStore((s) => s.markLayerDownloaded);
+  const trackId = layer.id;
+  const isGlobalMuted = useSessionStore(state => state.mutedTracks).has(trackId);
+  const isTrackSoloed = useSessionStore(state => state.soloedTracks).has(trackId);
+  const isAnyTrackSoloed = useSessionStore(state => state.soloedTracks).size > 0;
+  const forceMute = isGlobalMuted || (isAnyTrackSoloed && !isTrackSoloed);
+  const { toggleMuteTrack, toggleSoloTrack } = useSessionStore();
 
   const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
     containerRef,
     layer.url,
-    { startOffsetMs: layer.transportStartMs, interactive: true }
+    { startOffsetMs: layer.transportStartMs, interactive: true, forceMute }
   );
 
   useEffect(() => {
@@ -57,35 +63,78 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
   };
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-24 shrink-0 flex flex-col gap-1">
-        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider truncate">
-          Layer {index + 1}
-        </span>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setIsMuted(!isMuted)}
-            className="text-zinc-500 hover:text-primary transition-colors cursor-pointer"
-            title={isMuted ? 'Unmute layer' : 'Mute layer'}
-          >
-            {isMuted || volume === 0 ? <VolumeX size={12} /> : <Volume2 size={12} />}
-          </button>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={isMuted ? 0 : volume}
-            onChange={(e) => {
-              setIsMuted(false);
-              setVolume(parseFloat(e.target.value));
-            }}
-            className="w-12 accent-primary cursor-pointer h-1"
-          />
+    <div className="bg-surface rounded-xl flex flex-col md:flex-row shadow-lg shadow-black/20 border border-white/5 relative overflow-hidden group h-24">
+      {/* Left Sidebar */}
+      <div className="w-full md:w-64 p-3 flex flex-col justify-between border-b md:border-b-0 md:border-r border-white/10 bg-[#141416] shrink-0 z-20">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold text-zinc-300 flex items-center gap-2 tracking-wide font-sans truncate">
+            <span className="truncate">Layer {index + 1}</span>
+          </h2>
+          
+          {/* Mute / Solo */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button 
+              onClick={() => toggleMuteTrack(trackId)} 
+              className={`w-6 h-6 flex items-center justify-center rounded font-bold text-[9px] transition-colors cursor-pointer ${isGlobalMuted ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-black/30 text-zinc-400 border border-white/5 hover:text-white'}`}
+              title="Mute Track"
+            >
+              M
+            </button>
+            <button 
+              onClick={() => toggleSoloTrack(trackId)} 
+              className={`w-6 h-6 flex items-center justify-center rounded font-bold text-[9px] transition-colors cursor-pointer ${isTrackSoloed ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-black/30 text-zinc-400 border border-white/5 hover:text-white'}`}
+              title="Solo Track"
+            >
+              S
+            </button>
+          </div>
+        </div>
+
+        {/* Volume & Controls */}
+        <div className="flex flex-col gap-2 mt-2">
+          <div className="flex items-center gap-2 text-zinc-400 bg-black/40 px-2 py-1 rounded-md border border-white/[0.03]">
+            <button onClick={() => setIsMuted(!isMuted)} className="hover:text-white transition-colors cursor-pointer shrink-0">
+              {isMuted || volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+            </button>
+            <input 
+              type="range" 
+              min="0" 
+              max="1" 
+              step="0.01" 
+              value={isMuted ? 0 : volume}
+              onChange={(e) => {
+                setIsMuted(false);
+                setVolume(parseFloat(e.target.value));
+              }}
+              className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-full appearance-none"
+            />
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleDownload}
+              className={`flex-1 text-[10px] px-2 py-1 rounded border transition-colors flex items-center justify-center gap-1 cursor-pointer font-sans font-semibold ${
+                layer.downloaded 
+                  ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' 
+                  : 'bg-white/[0.04] text-zinc-400 border-white/[0.05] hover:text-white hover:bg-white/[0.08]'
+              }`}
+              title={layer.downloaded ? 'Downloaded' : 'Download this layer'}
+            >
+              {layer.downloaded ? <Check size={12} /> : <Download size={12} />}
+              {layer.downloaded ? 'Saved' : 'Download'}
+            </button>
+            <button
+              onClick={handleRemove}
+              className="text-[10px] bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-200 border border-red-500/20 px-2 py-1 rounded transition-colors flex items-center justify-center cursor-pointer"
+              title="Discard layer"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 relative h-11 bg-black/40 rounded-md overflow-hidden border border-white/[0.05]">
+      <div className="flex-1 relative bg-black/40 overflow-hidden border-l border-white/[0.05] hover:bg-black/20 transition-all duration-300">
         <div
           ref={containerRef}
           className="absolute top-0 bottom-0"
@@ -97,24 +146,6 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
           </div>
         )}
       </div>
-
-      <button
-        onClick={handleDownload}
-        className={`p-1.5 shrink-0 cursor-pointer transition-colors ${
-          layer.downloaded ? 'text-emerald-500 hover:text-emerald-400' : 'text-zinc-500 hover:text-emerald-400'
-        }`}
-        title={layer.downloaded ? 'Downloaded — click to save again' : 'Download this layer'}
-      >
-        {layer.downloaded ? <Check size={13} /> : <Download size={13} />}
-      </button>
-
-      <button
-        onClick={handleRemove}
-        className="text-zinc-500 hover:text-red-400 p-1.5 shrink-0 cursor-pointer transition-colors"
-        title="Discard layer"
-      >
-        <Trash2 size={13} />
-      </button>
     </div>
   );
 }

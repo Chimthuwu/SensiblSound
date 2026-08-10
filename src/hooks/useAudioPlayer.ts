@@ -9,6 +9,8 @@ export interface AudioPlayerOptions {
   interactive?: boolean;
   /** Actual file/blob, which is more robust for WaveSurfer to load than object URLs */
   blob?: Blob;
+  /** Force mute state, ignoring local isMuted. Used for global solo/mute functionality */
+  forceMute?: boolean;
 }
 
 export function useAudioPlayer(
@@ -103,6 +105,7 @@ export function useAudioPlayer(
     
     // Always clear the old buffer before loading a new one so it doesn't accidentally
     // play the old track if the new one fails to load!
+    wavesurfer.current.pause();
     wavesurfer.current.empty();
     setIsReady(false);
 
@@ -124,8 +127,9 @@ export function useAudioPlayer(
   // Sync volume and mute
   useEffect(() => {
     if (!wavesurfer.current) return;
-    wavesurfer.current.setVolume(isMuted ? 0 : volume);
-  }, [volume, isMuted]);
+    const effectivelyMuted = options?.forceMute || isMuted;
+    wavesurfer.current.setVolume(effectivelyMuted ? 0 : volume);
+  }, [volume, isMuted, options?.forceMute]);
 
   // THE main sync effect: offset-aware seeking + play/pause windowing.
   //
