@@ -58,6 +58,7 @@ export interface FxSettings {
   delayFeedback: number;
   delayTime: number;
   reverbWet: number;
+  micGain: number;
 }
 
 export interface SessionState {

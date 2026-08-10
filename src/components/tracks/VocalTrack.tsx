@@ -139,7 +139,7 @@ export function VocalTrack() {
   const {
     isRecording, activeTake, setActiveTake, layers, addLayer, removeLayer,
     isMonitoring, setIsMonitoring, bpm, setActiveTakeDurationMs,
-    markActiveTakeDownloaded
+    markActiveTakeDownloaded, fxSettings, setFxSettings
   } = useSessionStore();
   const layersTimelineDurationMs = useSessionStore(getLayerTimelineDurationMs);
   const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady, stream } = useAudioRecorder();
@@ -274,6 +274,21 @@ export function VocalTrack() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="mt-2 flex items-center gap-2 px-1" title="Microphone Input Gain">
+              <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-wider w-8">Gain</span>
+              <input
+                type="range"
+                min="0"
+                max="200"
+                value={fxSettings.micGain ?? 100}
+                onChange={(e) => setFxSettings({ micGain: parseInt(e.target.value) })}
+                className="flex-1 h-1 bg-white/10 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-2 [&::-webkit-slider-thumb]:h-2 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white cursor-pointer"
+              />
+              <span className="text-[9px] text-zinc-500 font-medium w-6 text-right">
+                {fxSettings.micGain ?? 100}%
+              </span>
             </div>
           </div>
         </div>

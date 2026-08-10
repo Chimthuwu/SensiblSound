@@ -105,6 +105,7 @@ export function useAudioRecorder() {
     let reverbWetGain: GainNode | null = null;
     let outputGain: GainNode | null = null;
     let streamDestination: MediaStreamAudioDestinationNode | null = null;
+    let inputGainNode: GainNode | null = null;
 
     try {
       audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -112,10 +113,15 @@ export function useAudioRecorder() {
       streamDestination = audioCtx.createMediaStreamDestination();
       processedStreamRef.current = streamDestination.stream;
 
+      // Apply Input Gain (always on, even if fxEnabled is false)
+      inputGainNode = audioCtx.createGain();
+      inputGainNode.gain.value = (fxSettings.micGain ?? 100) / 100;
+      source.connect(inputGainNode);
+
       if (fxEnabled) {
         // Use a `prev` pointer so each disabled module is bypassed automatically:
         // if a node is not created, prev simply flows past it to the next stage.
-        let prev: AudioNode = source;
+        let prev: AudioNode = inputGainNode;
 
         // 1. Dynamics Compressor — gated by compressorEnabled
         if (fxSettings.compressorEnabled) {
@@ -267,9 +273,9 @@ export function useAudioRecorder() {
           outputGain.connect(audioCtx.destination);
         }
       } else {
-        source.connect(streamDestination);
+        inputGainNode.connect(streamDestination);
         if (isMonitoring) {
-          source.connect(audioCtx.destination);
+          inputGainNode.connect(audioCtx.destination);
         }
       }
     } catch (e) {
@@ -279,6 +285,7 @@ export function useAudioRecorder() {
     return () => {
       // All nodes are null when not created; safe no-op via null checks.
       if (source) source.disconnect();
+      if (inputGainNode) inputGainNode.disconnect();
       if (compressor) compressor.disconnect();
       if (lowShelf) lowShelf.disconnect();
       if (midPeaking) midPeaking.disconnect();

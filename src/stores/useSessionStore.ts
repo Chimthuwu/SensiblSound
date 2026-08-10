@@ -48,8 +48,9 @@ export const useSessionStore = create<SessionState>((set) => ({
     eqMid: 0,
     eqHigh: 0,
     delayFeedback: 30,
-    delayTime: 0.35,
-    reverbWet: 25,
+    delayTime: 0.3,
+    reverbWet: 40,
+    micGain: 100,
   },
 
   setBpm: (bpm) => set({ bpm }),
