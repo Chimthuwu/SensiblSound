@@ -63,7 +63,7 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
   };
 
   return (
-    <div className="bg-surface rounded-xl flex flex-col md:flex-row shadow-lg shadow-black/20 border border-white/5 relative overflow-hidden group h-24">
+    <div className="bg-surface rounded-xl flex flex-col md:flex-row shadow-lg shadow-black/20 border border-white/5 relative overflow-hidden group h-28">
       {/* Left Sidebar */}
       <div className="w-full md:w-64 p-3 flex flex-col justify-between border-b md:border-b-0 md:border-r border-white/10 bg-[#141416] shrink-0 z-20">
         <div className="flex items-center justify-between">
