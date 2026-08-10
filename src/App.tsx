@@ -214,12 +214,22 @@ function App() {
               )
             )}
 
-            <button className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0">
+            <a 
+              href="https://github.com/Chimthuwu/SensiblSound/releases/latest"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0 inline-flex items-center"
+            >
               Desktop DL
-            </button>
-            <button className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0">
+            </a>
+            <a 
+              href="https://github.com/Chimthuwu/SensiblSound/releases/latest"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0 inline-flex items-center"
+            >
               Android APK DL
-            </button>
+            </a>
 
             <button className="text-xs bg-primary/10 hover:bg-primary/25 text-primary font-semibold px-4 py-1.5 rounded-lg transition-all duration-300 border border-primary/15 hover:border-primary/30 flex items-center gap-2 cursor-pointer shrink-0">
               <Share2 size={13} />
