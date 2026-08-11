@@ -173,9 +173,31 @@ export function VocalTrack() {
     }
   }, [activeTake?.id, isReady, duration, setActiveTakeDurationMs]);
 
-  const handleDownloadActiveTake = () => {
+  const handleDownloadActiveTake = async (format: 'wav' | 'mp3' = 'wav') => {
     if (!activeTake) return;
-    downloadBlobUrl(activeTake.url, buildTakeFilename(activeTake.timestamp, 'vocal-take', activeTake.mimeType));
+    let downloadUrl = activeTake.url;
+    let mimeType = activeTake.mimeType;
+    let extension = undefined;
+    
+    if (format === 'mp3') {
+      try {
+        const { convertBlobToAudioBuffer, encodeMp3 } = await import('../../utils/audioEncoding');
+        let blobToConvert = activeTake.blob;
+        if (!blobToConvert) {
+          blobToConvert = await (await fetch(activeTake.url)).blob();
+        }
+        const audioBuffer = await convertBlobToAudioBuffer(blobToConvert);
+        const mp3Blob = encodeMp3(audioBuffer);
+        downloadUrl = URL.createObjectURL(mp3Blob);
+        mimeType = 'audio/mp3';
+        extension = 'mp3';
+      } catch (e) {
+        console.error("Failed to convert to mp3", e);
+        return;
+      }
+    }
+    
+    downloadBlobUrl(downloadUrl, buildTakeFilename(activeTake.timestamp, 'vocal-take', mimeType, extension));
     markActiveTakeDownloaded();
   };
 
@@ -378,29 +400,39 @@ export function VocalTrack() {
             </button>
           </div>
           
-          <motion.button
-            onClick={handleDownloadActiveTake}
-            animate={activeTake.downloaded ? {} : {
-              boxShadow: [
-                '0 0 0px rgba(16,185,129,0)',
-                '0 0 22px rgba(16,185,129,0.6)',
-                '0 0 0px rgba(16,185,129,0)',
-              ],
-            }}
-            transition={{ repeat: activeTake.downloaded ? 0 : Infinity, duration: 1.8 }}
-            className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded font-bold text-xs tracking-wide transition-colors cursor-pointer ${
-              activeTake.downloaded
-                ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30'
-                : 'bg-emerald-500 hover:bg-emerald-400 text-black border border-emerald-400'
-            }`}
-            title="Save this recording as a file on your device"
-          >
-            {activeTake.downloaded ? (
-              <><Check size={14} /> Saved</>
-            ) : (
-              <><Download size={14} /> Download</>
-            )}
-          </motion.button>
+          <div className="flex items-center gap-2">
+            <motion.button
+              onClick={() => handleDownloadActiveTake('wav')}
+              animate={activeTake.downloaded ? {} : {
+                boxShadow: [
+                  '0 0 0px rgba(16,185,129,0)',
+                  '0 0 22px rgba(16,185,129,0.6)',
+                  '0 0 0px rgba(16,185,129,0)',
+                ],
+              }}
+              transition={{ repeat: activeTake.downloaded ? 0 : Infinity, duration: 1.8 }}
+              className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded font-bold text-xs tracking-wide transition-colors cursor-pointer ${
+                activeTake.downloaded
+                  ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-black border border-emerald-400'
+              }`}
+              title="Save this recording as a WAV file"
+            >
+              {activeTake.downloaded ? (
+                <><Check size={14} /> Saved (WAV)</>
+              ) : (
+                <><Download size={14} /> WAV</>
+              )}
+            </motion.button>
+
+            <button
+              onClick={() => handleDownloadActiveTake('mp3')}
+              className="flex items-center justify-center gap-2 px-3 py-1.5 rounded font-bold text-xs tracking-wide transition-colors cursor-pointer bg-[#141416] hover:bg-[#1f1f22] text-zinc-300 border border-white/10"
+              title="Save this recording as an MP3 file"
+            >
+              <Download size={14} /> MP3
+            </button>
+          </div>
         </div>
       )}
 

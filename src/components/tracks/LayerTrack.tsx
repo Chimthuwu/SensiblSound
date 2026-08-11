@@ -48,8 +48,30 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
   // zero-width sliver — it snaps to the real size once WaveSurfer decodes.
   const widthPercent = Math.max(0, Math.min(100 - leftPercent, knownWidthPercent || (100 - leftPercent)));
 
-  const handleDownload = () => {
-    downloadBlobUrl(layer.url, buildTakeFilename(layer.timestamp, `vocal-layer-${index + 1}`, layer.mimeType));
+  const handleDownload = async (format: 'wav' | 'mp3' = 'wav') => {
+    let downloadUrl = layer.url;
+    let mimeType = layer.mimeType;
+    let extension = undefined;
+    
+    if (format === 'mp3') {
+      try {
+        const { convertBlobToAudioBuffer, encodeMp3 } = await import('../../utils/audioEncoding');
+        let blobToConvert = layer.blob;
+        if (!blobToConvert) {
+          blobToConvert = await (await fetch(layer.url)).blob();
+        }
+        const audioBuffer = await convertBlobToAudioBuffer(blobToConvert);
+        const mp3Blob = encodeMp3(audioBuffer);
+        downloadUrl = URL.createObjectURL(mp3Blob);
+        mimeType = 'audio/mp3';
+        extension = 'mp3';
+      } catch (e) {
+        console.error("Failed to convert to mp3", e);
+        return;
+      }
+    }
+
+    downloadBlobUrl(downloadUrl, buildTakeFilename(layer.timestamp, `vocal-layer-${index + 1}`, mimeType, extension));
     markLayerDownloaded(layer.id);
   };
 
@@ -112,16 +134,24 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
           
           <div className="flex items-center gap-1">
             <button
-              onClick={handleDownload}
+              onClick={() => handleDownload('wav')}
               className={`flex-1 text-[10px] px-2 py-1 rounded border transition-colors flex items-center justify-center gap-1 cursor-pointer font-sans font-semibold ${
                 layer.downloaded 
                   ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' 
                   : 'bg-white/[0.04] text-zinc-400 border-white/[0.05] hover:text-white hover:bg-white/[0.08]'
               }`}
-              title={layer.downloaded ? 'Downloaded' : 'Download this layer'}
+              title={layer.downloaded ? 'Downloaded (WAV)' : 'Download this layer as WAV'}
             >
               {layer.downloaded ? <Check size={12} /> : <Download size={12} />}
-              {layer.downloaded ? 'Saved' : 'Download'}
+              WAV
+            </button>
+            <button
+              onClick={() => handleDownload('mp3')}
+              className="flex-1 text-[10px] px-2 py-1 rounded border border-white/[0.05] bg-[#141416] text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-1 cursor-pointer font-sans font-semibold"
+              title="Download this layer as MP3"
+            >
+              <Download size={12} />
+              MP3
             </button>
             <button
               onClick={handleRemove}

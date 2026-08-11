@@ -23,19 +23,39 @@ interface RecordingRowProps {
 
 function RecordingRow({ entry, index, alreadyInLayers }: RecordingRowProps) {
   const addLayer = useSessionStore((s) => s.addLayer);
-  const [busy, setBusy] = useState<'download' | 'add' | null>(null);
+  const [busy, setBusy] = useState<'download-wav' | 'download-mp3' | 'add' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState(alreadyInLayers);
 
-  const withBlob = async (action: 'download' | 'add') => {
+  const withBlob = async (action: 'download-wav' | 'download-mp3' | 'add') => {
     setBusy(action);
     setError(null);
     try {
       const blob = await backupService.getRecordingBlob(entry.id);
-      const url = URL.createObjectURL(blob);
-      if (action === 'download') {
-        downloadBlobUrl(url, buildTakeFilename(entry.timestamp, `recording-${index + 1}`, entry.mimeType));
+      
+      if (action.startsWith('download')) {
+        const isMp3 = action === 'download-mp3';
+        let downloadUrl = URL.createObjectURL(blob);
+        let mimeType = entry.mimeType;
+        let extension = undefined;
+
+        if (isMp3) {
+          try {
+            const { convertBlobToAudioBuffer, encodeMp3 } = await import('../utils/audioEncoding');
+            const audioBuffer = await convertBlobToAudioBuffer(blob);
+            const mp3Blob = encodeMp3(audioBuffer);
+            downloadUrl = URL.createObjectURL(mp3Blob);
+            mimeType = 'audio/mp3';
+            extension = 'mp3';
+          } catch (e) {
+            console.error("Failed to convert to mp3", e);
+            throw new Error("Failed to encode MP3");
+          }
+        }
+        
+        downloadBlobUrl(downloadUrl, buildTakeFilename(entry.timestamp, `recording-${index + 1}`, mimeType, extension));
       } else {
+        const url = URL.createObjectURL(blob);
         addLayer({ id: entry.id, url, blob, timestamp: entry.timestamp, transportStartMs: entry.transportStartMs, mimeType: entry.mimeType });
         setAdded(true);
       }
@@ -53,12 +73,22 @@ function RecordingRow({ entry, index, alreadyInLayers }: RecordingRowProps) {
         <span className="text-sm text-zinc-200 font-medium">{formatTimestamp(entry.timestamp)}</span>
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={() => withBlob('download')}
+            onClick={() => withBlob('download-wav')}
             disabled={busy !== null}
             className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] px-3 py-1.5 rounded-md transition-all cursor-pointer font-semibold text-zinc-200 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-wait"
+            title="Download as WAV"
           >
-            {busy === 'download' ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-            Download
+            {busy === 'download-wav' ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+            WAV
+          </button>
+          <button
+            onClick={() => withBlob('download-mp3')}
+            disabled={busy !== null}
+            className="text-xs bg-[#141416] hover:bg-[#1f1f22] border border-white/10 px-3 py-1.5 rounded-md transition-all cursor-pointer font-semibold text-zinc-300 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-wait"
+            title="Download as MP3"
+          >
+            {busy === 'download-mp3' ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+            MP3
           </button>
           <button
             onClick={() => withBlob('add')}
