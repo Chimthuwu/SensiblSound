@@ -33,6 +33,7 @@
     "@capacitor/core": "^8.5.0",
     "firebase": "^12.17.0",
     "framer-motion": "^12.42.0",
+    "lamejs": "^1.2.1",
     "lucide-react": "^1.22.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

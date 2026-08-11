@@ -351,10 +351,24 @@ export function useAudioRecorder() {
 
       mediaRecorder.current.onstop = async () => {
         const mimeType = mediaRecorder.current?.mimeType || 'audio/webm';
-        const blob = new Blob(audioChunks.current, { type: mimeType });
-        const url = URL.createObjectURL(blob);
+        const webmBlob = new Blob(audioChunks.current, { type: mimeType });
+        
+        let finalBlob = webmBlob;
+        let finalMimeType = mimeType;
+        
+        try {
+          // Convert WebM to WAV dynamically
+          const { convertBlobToAudioBuffer, encodeWav } = await import('../utils/audioEncoding');
+          const audioBuffer = await convertBlobToAudioBuffer(webmBlob);
+          finalBlob = encodeWav(audioBuffer);
+          finalMimeType = 'audio/wav';
+        } catch (e) {
+          console.error("Failed to convert webm to wav:", e);
+        }
+
+        const url = URL.createObjectURL(finalBlob);
         const id = crypto.randomUUID();
-        setActiveTake({ id, url, blob, timestamp: Date.now(), transportStartMs, mimeType });
+        setActiveTake({ id, url, blob: finalBlob, timestamp: Date.now(), transportStartMs, mimeType: finalMimeType });
 
         // Trigger Backup Process — local (IndexedDB), cloud (Firebase
         // Storage) and Google Drive are independent, all real, and reported
