@@ -255,13 +255,18 @@ export function VocalFxRack() {
               Prevents label+toggles overflow in narrow grid columns. */}
           <div className="border-b border-white/[0.02] pb-1.5 flex flex-col gap-1.5">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-sans">
-              <Music size={11} className="text-primary" /> T-Pain &amp; Doubler
+              <Music size={11} className="text-primary" /> Vocals &amp; Doubler
             </span>
             <div className="flex items-center justify-end gap-1">
               <FxToggleButton
                 enabled={fxSettings.autotuneEnabled}
                 onClick={() => setFxSettings({ autotuneEnabled: !fxSettings.autotuneEnabled })}
-                label="T-Pain"
+                label="AutoTune"
+              />
+              <FxToggleButton
+                enabled={fxSettings.pitchCorrectionEnabled}
+                onClick={() => setFxSettings({ pitchCorrectionEnabled: !fxSettings.pitchCorrectionEnabled })}
+                label="Pitch Corr"
               />
               <FxToggleButton
                 enabled={fxSettings.doubleEnabled}
@@ -272,7 +277,7 @@ export function VocalFxRack() {
           </div>
 
           {/* Autotune sub-section: gates on autotuneEnabled */}
-          <div className={`flex flex-col gap-2.5 transition-opacity duration-300 ${(fxEnabled && fxSettings.autotuneEnabled) ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+          <div className={`flex flex-col gap-2.5 transition-opacity duration-300 ${(fxEnabled && (fxSettings.autotuneEnabled || fxSettings.pitchCorrectionEnabled)) ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
             <div className="flex gap-2">
               <select
                 value={fxSettings.autotuneKey}
