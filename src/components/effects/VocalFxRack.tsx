@@ -255,13 +255,13 @@ export function VocalFxRack() {
               Prevents label+toggles overflow in narrow grid columns. */}
           <div className="border-b border-white/[0.02] pb-1.5 flex flex-col gap-1.5">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-sans">
-              <Music size={11} className="text-primary" /> Tuning &amp; Doubler
+              <Music size={11} className="text-primary" /> T-Pain &amp; Doubler
             </span>
             <div className="flex items-center justify-end gap-1">
               <FxToggleButton
                 enabled={fxSettings.autotuneEnabled}
                 onClick={() => setFxSettings({ autotuneEnabled: !fxSettings.autotuneEnabled })}
-                label="Tune"
+                label="T-Pain"
               />
               <FxToggleButton
                 enabled={fxSettings.doubleEnabled}
