@@ -294,6 +294,34 @@ export function VocalFxRack() {
                 <span>Retune Speed</span>
                 <span className="font-mono text-primary font-bold">{fxSettings.autotuneSpeed}ms</span>
               </div>
+            <div>
+              <div className="flex justify-between text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
+                <span>Formant Shift</span>
+                <span className="font-mono text-primary font-bold">{fxSettings.formantShift}st</span>
+              </div>
+              <input
+                type="range"
+                min="-12"
+                max="12"
+                value={fxSettings.formantShift}
+                onChange={(e) => setFxSettings({ formantShift: parseInt(e.target.value) })}
+                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+              />
+            </div>
+            <div>
+              <div className="flex justify-between text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
+                <span>Pitch Shift</span>
+                <span className="font-mono text-primary font-bold">{fxSettings.pitchShiftSemitones}st</span>
+              </div>
+              <input
+                type="range"
+                min="-12"
+                max="12"
+                value={fxSettings.pitchShiftSemitones}
+                onChange={(e) => setFxSettings({ pitchShiftSemitones: parseInt(e.target.value) })}
+                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+              />
+            </div>
               <input
                 type="range"
                 min="0" max="100"
