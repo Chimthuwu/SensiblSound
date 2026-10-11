@@ -49,6 +49,7 @@ export interface FxSettings {
   autotuneKey: string;
   autotuneScale: string;
   autotuneSpeed: number;
+  pitchCorrectionEnabled: boolean;
   // New autotune controls
   formantShift: number; // in semitones, -12 to 12
   pitchShiftSemitones: number; // in semitones, -12 to 12

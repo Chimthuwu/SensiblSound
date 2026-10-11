@@ -357,7 +357,47 @@ export function useAudioRecorder() {
           detectPitchLoop();
         }
 
-        // 4. Output stage — created once. The doubler splits above into
+        
+// 3. Autotune (saturation + pitch-shift LFO delay) — gated by autotuneEnabled
+        if (fxSettings.pitchCorrectionEnabled) {
+          // Saturation (Waveshaper) bundled with the autotune chain
+          waveshaperPC = audioCtx.createWaveShaper();
+          const makeDistortionCurve = (amount: number) => {
+            const k = typeof amount === 'number' ? amount : 15;
+            const n_samples = 44100;
+            const curve = new Float32Array(n_samples);
+            const deg = Math.PI / 180;
+            for (let i = 0; i < n_samples; ++i) {
+              const x = (i * 2) / n_samples - 1;
+              curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+            }
+            return curve;
+          };
+          waveshaperPC.curve = makeDistortionCurve(10);
+          waveshaperPC.oversample = '4x';
+
+          // Pitch shifter + LFO for vibrato/correction modulation
+          pitchShifterPC = audioCtx.createDelay(0.1);
+          pitchShifterPC.delayTime.value = 0.005; // 5ms delay
+
+          pitchModLFOPC = audioCtx.createOscillator();
+          pitchModLFOPC.frequency.value = 7.5;
+
+          pitchModGainPC = audioCtx.createGain();
+          // Speed determines depth of pitch modulation correction
+          pitchModGainPC.gain.value = (fxSettings.autotuneSpeed / 100) * 0.0012;
+
+          pitchModLFOPC.connect(pitchModGainPC);
+          pitchModGainPC.connect(pitchShifterPC.delayTime);
+          pitchModLFOPC.start();
+
+          prev.connect(waveshaperPC);
+          waveshaperPC.connect(pitchShifterPC);
+          prev = pitchShifterPC;
+        }
+
+        
+// 4. Output stage — created once. The doubler splits above into
         //    left/dry-pan and right/delay-pan outputGain mixes.
         outputGain = audioCtx.createGain();
         outputGain.gain.value = 0.9;
