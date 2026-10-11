@@ -5,11 +5,7 @@ import { isDriveConfigured } from '../lib/googleDrive';
 
 export const useSessionStore = create<SessionState>((set) => ({
   bpm: 120,
-  backingTrack: {
-    id: 'default-backing-track',
-    name: 'example.mp3',
-    url: '/example.mp3'
-  },
+  backingTrack: undefined,
   activeTake: undefined,
   layers: [],
   isRecording: false,
