@@ -479,6 +479,19 @@ export function VocalFxRack() {
                 className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
               />
             </div>
+            <div>
+              <div className="flex justify-between text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
+                <span>Reverb Decay</span>
+                <span className="font-mono text-zinc-400 font-semibold">{fxSettings.reverbDecay}%</span>
+              </div>
+              <input
+                type="range"
+                min="0" max="100"
+                value={fxSettings.reverbDecay}
+                onChange={(e) => setFxSettings({ reverbDecay: parseInt(e.target.value) })}
+                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+              />
+            </div>
           </div>
         </div>
 
