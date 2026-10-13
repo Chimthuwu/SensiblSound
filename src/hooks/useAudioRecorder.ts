@@ -8,9 +8,18 @@ export function useAudioRecorder() {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isReady, setIsReady] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  
+
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
+
+  // DEBUG: log every mutation to processedStreamRef
+  // const _prBefore = useRef<MediaStream | null>(null);
+  // useLayoutEffect(() => {
+  //   if (processedStreamRef.current !== _prBefore.current) {
+  //     console.log('[useAudioRecorder] processedStreamRef changed to', processedStreamRef.current?.id || null);
+  //     _prBefore.current = processedStreamRef.current;
+  //   }
+  // });
 
   // Enumerate devices on mount and request permission
   useEffect(() => {
@@ -18,7 +27,7 @@ export function useAudioRecorder() {
       try {
         const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true }); // Request permission first
         tempStream.getTracks().forEach(track => track.stop()); // Stop temporary track immediately
-        
+
         const devs = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devs.filter(d => d.kind === 'audioinput');
         setDevices(audioInputs);
@@ -43,7 +52,7 @@ export function useAudioRecorder() {
     async function setupStream() {
       try {
         // Raw quality constraints (no echo cancellation or noise suppression for recording)
-        const audioConstraints = { 
+        const audioConstraints = {
           deviceId: { exact: selectedDeviceId },
           echoCancellation: false,
           noiseSuppression: false,
@@ -91,10 +100,9 @@ export function useAudioRecorder() {
     let pitchShifter: DelayNode | null = null;
     // For pitch detection
     let analyser: AnalyserNode | null = null;
-    let dataArray: Float32Array | null = null;
+    let dataArray: Float32Array<ArrayBuffer> | null = null;
     let rafID: number | null = null;
     // Pitch tracking
-    let lastPitch: number = 0;
     let pitchBuffer: number[] = [];
     const PITCH_BUFFER_SIZE = 5;
     let targetDelayTime: number = 0.005; // Base delay time
@@ -122,27 +130,10 @@ export function useAudioRecorder() {
       const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
       const index = noteNames.indexOf(noteName);
       if (index === -1) return 440; // Default to A4
-      
+
       // Calculate semitones from A4
       const semitonesFromA4 = (octave - 4) * 12 + (index - 9); // A is index 9
       return 440 * Math.pow(2, semitonesFromA4 / 12);
-    }
-
-    function frequencyToNoteName(frequency: number): { note: string, octave: string, centsOff: number } {
-      if (frequency <= 0) return { note: 'C', octave: '4', centsOff: 0 };
-      
-      const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      const log2 = Math.log2(frequency / 440);
-      const semitonesFromA4 = Math.round(log2 * 12);
-      const octave = 4 + Math.floor((semitonesFromA4 + 9) / 12);
-      const noteIndex = ((semitonesFromA4 + 9) % 12 + 12) % 12;
-      const note = noteNames[noteIndex];
-      
-      // Calculate cents off
-      const idealFrequency = noteNameToFrequency(note, parseInt(octave));
-      const centsOff = Math.round(1200 * Math.log2(frequency / idealFrequency));
-      
-      return { note, octave: octave.toString(), centsOff };
     }
 
     function getScaleFrequencies(key: string, scale: string, minOctave: number = 3, maxOctave: number = 5): number[] {
@@ -151,14 +142,14 @@ export function useAudioRecorder() {
         'Minor': [0, 2, 3, 5, 7, 8, 10], // C D Eb F G Ab Bb
         'Chromatic': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] // All semitones
       };
-      
+
       const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
       const keyIndex = noteNames.indexOf(key);
       if (keyIndex === -1) return [440]; // Default to A4 if key not found
-      
+
       const frequencies: number[] = [];
       const scaleIntervals = notes[scale] || notes['Major'];
-      
+
       for (let octave = minOctave; octave <= maxOctave; octave++) {
         for (const interval of scaleIntervals) {
           const noteIndex = (keyIndex + interval) % 12;
@@ -168,7 +159,7 @@ export function useAudioRecorder() {
           frequencies.push(frequency);
         }
       }
-      
+
       return frequencies.sort((a, b) => a - b);
     }
 
@@ -177,11 +168,11 @@ export function useAudioRecorder() {
       const bufferSize = audioData.length;
       let maxVal = -Infinity;
       let maxIndex = -1;
-      
+
       // Limit the search to reasonable pitch ranges for voice (80-500 Hz)
       const minDelay = Math.floor(sampleRate / 500); // 500 Hz
       const maxDelay = Math.floor(sampleRate / 80);   // 80 Hz
-      
+
       for (let delay = minDelay; delay < maxDelay; delay++) {
         let sum = 0;
         for (let i = 0; i < bufferSize - delay; i++) {
@@ -192,7 +183,7 @@ export function useAudioRecorder() {
           maxIndex = delay;
         }
       }
-      
+
       if (maxIndex > 0) {
         return sampleRate / maxIndex;
       }
@@ -296,31 +287,31 @@ export function useAudioRecorder() {
           tapPoint.gain.value = 0.5; // Reduce level to avoid clipping
           waveshaper.connect(tapPoint);
           tapPoint.connect(analyser);
-          
+
           // Start pitch detection loop
           function detectPitchLoop() {
             if (!analyser || !dataArray) return;
-            
+
             analyser.getFloatTimeDomainData(dataArray);
             const pitch = detectPitch(dataArray!, audioCtx.sampleRate);
-            
+
             if (pitch > 0) {
               // Add to pitch buffer for smoothing
               pitchBuffer.push(pitch);
               if (pitchBuffer.length > PITCH_BUFFER_SIZE) {
                 pitchBuffer.shift();
               }
-              
+
               // Calculate average pitch from buffer
               const avgPitch = pitchBuffer.reduce((sum, p) => sum + p, 0) / pitchBuffer.length;
-              
+
               // Get target scale frequencies
               const scaleFreqs = getScaleFrequencies(fxSettings.autotuneKey, fxSettings.autotuneScale);
-              
+
               // Find closest target frequency
               let closestFreq = scaleFreqs[0];
               let minDist = Math.abs(avgPitch - closestFreq);
-              
+
               for (let i = 1; i < scaleFreqs.length; i++) {
                 const dist = Math.abs(avgPitch - scaleFreqs[i]);
                 if (dist < minDist) {
@@ -328,7 +319,7 @@ export function useAudioRecorder() {
                   closestFreq = scaleFreqs[i];
                 }
               }
-              
+
               // Calculate pitch shift ratio
               if (avgPitch > 0) {
                 // Compute the base delay time for the desired formant and pitch shift
@@ -336,24 +327,22 @@ export function useAudioRecorder() {
                 const baseDelayTimeDesired = 0.005 * Math.pow(2, -desiredSemitones / 12);
                 // Compute the target delay time for autotune correction: baseDelayTimeDesired * (avgPitch / closestFreq)
                 let newDelayTime = baseDelayTimeDesired * (avgPitch / closestFreq);
-                
+
                 // Clamp to reasonable range (2ms to 20ms)
                 newDelayTime = Math.max(0.002, Math.min(0.020, newDelayTime));
-                
+
                 // Smooth the delay time to avoid artifacts
                 targetDelayTime = newDelayTime;
                 currentDelayTime = smoothDelayTime(targetDelayTime, currentDelayTime, SMOOTHING_FACTOR);
-                
+
                 if (pitchShifter) {
                   pitchShifter.delayTime.value = currentDelayTime;
                 }
-                }
               }
             }
-            
             rafID = requestAnimationFrame(detectPitchLoop);
           }
-          
+
           detectPitchLoop();
         }
 
@@ -408,20 +397,20 @@ export function useAudioRecorder() {
           delayWetGain.connect(audioCtx.destination);
         }
 
-        // 6. Reverb Space — gated by reverbEnabled
+        // 6. Reverb — gated by reverbEnabled
         if (fxSettings.reverbEnabled) {
-          reverbDelay = audioCtx.createDelay(0.2);
-          reverbDelay.delayTime.value = 0.045;
+          reverbDelay = audioCtx.createDelay(1.5);
+          reverbDelay.delayTime.value = 0.4;
 
           reverbFeedback = audioCtx.createGain();
-          reverbFeedback.gain.value = fxSettings.reverbWet / 150;
-          reverbDelay.connect(reverbFeedback);
-          reverbFeedback.connect(reverbDelay);
+          reverbFeedback.gain.value = 0.5;
 
           reverbWetGain = audioCtx.createGain();
           reverbWetGain.gain.value = (fxSettings.reverbWet / 100) * 0.35;
 
           outputGain.connect(reverbDelay);
+          reverbDelay.connect(reverbFeedback);
+          reverbFeedback.connect(reverbDelay);
           reverbDelay.connect(reverbWetGain);
           reverbWetGain.connect(audioCtx.destination);
         }
@@ -448,7 +437,7 @@ export function useAudioRecorder() {
         cancelAnimationFrame(rafID);
         rafID = null;
       }
-      
+
       // All nodes are null when not created; safe no-op via null checks.
       if (source) source.disconnect();
       if (inputGainNode) inputGainNode.disconnect();
@@ -487,7 +476,7 @@ export function useAudioRecorder() {
 
   const startRecording = async () => {
     if (!stream) {
-      console.error("No active mic stream to record from");
+      console.error('No active mic stream to record from');
       setIsRecording(false);
       return;
     }
@@ -507,17 +496,17 @@ export function useAudioRecorder() {
       }
 
       mediaRecorder.current = new MediaRecorder(processedStreamRef.current || stream, options);
-      mediaRecorder.current.ondataavailable = (e) => {
+      mediaRecorder.current.ondataavailable = (e: BlobEvent) => {
         if (e.data.size > 0) audioChunks.current.push(e.data);
       };
 
       mediaRecorder.current.onstop = async () => {
         const mimeType = mediaRecorder.current?.mimeType || 'audio/webm';
         const webmBlob = new Blob(audioChunks.current, { type: mimeType });
-        
+
         let finalBlob = webmBlob;
         let finalMimeType = mimeType;
-        
+
         try {
           // Convert WebM to WAV dynamically
           const { convertBlobToAudioBuffer, encodeWav } = await import('../utils/audioEncoding');
@@ -579,9 +568,9 @@ export function useAudioRecorder() {
     }
   };
 
-  return { 
-    devices, 
-    selectedDeviceId, 
+  return {
+    devices,
+    selectedDeviceId,
     setSelectedDeviceId,
     isReady,
     stream

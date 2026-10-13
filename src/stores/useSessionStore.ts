@@ -37,13 +37,9 @@ export const useSessionStore = create<SessionState>((set) => ({
     autotuneKey: 'C',
     autotuneScale: 'Major',
     autotuneSpeed: 50,
-    // New autotune controls
     formantShift: 0,
     pitchShiftSemitones: 0,
     pitchCorrectionEnabled: false,
-    // New autotune controls
-    formantShift: 0,
-    pitchShiftSemitones: 0,
     compression: 40,
     doubleEnabled: false,
     doubleWidth: 70,
