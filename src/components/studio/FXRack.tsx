@@ -324,14 +324,26 @@ export function FXRack() {
             </div>
             <div className="studio-knob-unit">
               <Knob
+                value={fxSettings.reverbDecay}
+                min={0}
+                max={100}
+                unit="%"
+                onChange={(v) => setFxSettings({ reverbDecay: v })}
+                aria-label="Space"
+              />
+              <span className="studio-knob-name">Space</span>
+              <span className="studio-knob-value">{fxSettings.reverbDecay}%</span>
+            </div>
+            <div className="studio-knob-unit">
+              <Knob
                 value={fxSettings.reverbWet}
                 min={0}
                 max={100}
                 unit="%"
                 onChange={(v) => setFxSettings({ reverbWet: v })}
-                aria-label="Reverb"
+                aria-label="Reverb Mix"
               />
-              <span className="studio-knob-name">Reverb</span>
+              <span className="studio-knob-name">Verb Mix</span>
               <span className="studio-knob-value">{fxSettings.reverbWet}%</span>
             </div>
           </div>

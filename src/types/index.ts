@@ -61,6 +61,7 @@ export interface FxSettings {
   delayFeedback: number;
   delayTime: number;
   reverbWet: number;
+  reverbDecay: number; // 0-100, drives the reverb feedback (tail length)
   micGain: number;
 }
 

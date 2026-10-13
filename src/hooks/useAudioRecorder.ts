@@ -402,8 +402,10 @@ export function useAudioRecorder() {
           reverbDelay = audioCtx.createDelay(1.5);
           reverbDelay.delayTime.value = 0.4;
 
+          // Decay = comb feedback. Kept below 1 so the loop always decays;
+          // 0 gives a single 400 ms slap, 100 a long tail.
           reverbFeedback = audioCtx.createGain();
-          reverbFeedback.gain.value = 0.5;
+          reverbFeedback.gain.value = (fxSettings.reverbDecay / 100) * 0.9;
 
           reverbWetGain = audioCtx.createGain();
           reverbWetGain.gain.value = (fxSettings.reverbWet / 100) * 0.35;
