@@ -82,6 +82,8 @@ export function AudioEngine() {
   const layers = useSessionStore((s) => s.layers);
   const mutedTracks = useSessionStore((s) => s.mutedTracks);
   const trackVolumes = useSessionStore((s) => s.trackVolumes);
+  const extraTracks = useSessionStore((s) => s.extraTracks);
+  const setExtraTrackDuration = useSessionStore((s) => s.setExtraTrackDuration);
   const soloedTracks = useSessionStore((s) => s.soloedTracks);
   const setBackingTrackDurationMs = useSessionStore((s) => s.setBackingTrackDurationMs);
   const setActiveTakeDurationMs = useSessionStore((s) => s.setActiveTakeDurationMs);
@@ -114,6 +116,20 @@ export function AudioEngine() {
           volume={trackVolumes['active_take'] ?? 1}
           onDuration={setActiveTakeDurationMs}
         />
+      )}
+
+      {extraTracks.map((t) =>
+        t.clip ? (
+          <HeadlessPlayer
+            key={t.clip.id}
+            url={t.clip.url}
+            blob={t.clip.blob}
+            startOffsetMs={t.clip.startMs}
+            forceMute={isSilenced(t.id)}
+            volume={trackVolumes[t.id] ?? 1}
+            onDuration={(ms) => setExtraTrackDuration(t.id, ms)}
+          />
+        ) : null,
       )}
 
       {layers.map((layer) => (

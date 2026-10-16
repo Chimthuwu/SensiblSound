@@ -80,7 +80,20 @@ export interface FxSettings {
   micGain: number;
 }
 
-export type DeviceId = 'autotune' | 'doubler' | 'compressor' | 'eq' | 'delay' | 'reverb';
+export interface ExtraTrack {
+  id: string;
+  name: string;
+  clip?: {
+    id: string;
+    name: string;
+    url: string;
+    blob?: Blob;
+    durationMs?: number;
+    startMs: number;
+  };
+}
+
+export type DeviceId ='autotune' | 'doubler' | 'compressor' | 'eq' | 'delay' | 'reverb';
 
 export const ALL_DEVICES: DeviceId[] = ['autotune', 'doubler', 'compressor', 'eq', 'delay', 'reverb'];
 
@@ -131,8 +144,14 @@ export interface SessionState {
   selectedTrackId: string;
   setSelectedTrackId: (trackId: string) => void;
   setEqBand: (bandId: string, patch: Partial<Omit<EqBand, 'id'>>) => void;
-  // Move a clip on the timeline. trackId is a lane id: 'backing', 'active_take' or a layer id.
+  // Move a clip on the timeline. trackId is a lane id: 'backing', 'active_take', a layer id or an extra track id.
   setClipStart: (trackId: string, startMs: number) => void;
+  // Audio tracks the user added (+ Track, or dropped audio). Each holds at most one clip for now.
+  extraTracks: ExtraTrack[];
+  addTrack: (clip?: { name: string; url: string; blob?: Blob }) => string;
+  setTrackClip: (trackId: string, clip: { name: string; url: string; blob?: Blob }) => void;
+  setExtraTrackDuration: (trackId: string, durationMs: number) => void;
+  reorderDevice: (trackId: string, from: number, to: number) => void;
   // Ordered device chain per track. Adding/removing a device also turns its
   // effect on/off in fxSettings.
   trackDevices: Record<string, DeviceId[]>;

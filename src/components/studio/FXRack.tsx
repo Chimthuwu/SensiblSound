@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { ALL_DEVICES, type DeviceId } from '../../types';
 import { Knob } from './Knob';
@@ -102,6 +102,9 @@ export function FXRack() {
   const addDevice = useSessionStore((s) => s.addDevice);
   const removeDevice = useSessionStore((s) => s.removeDevice);
   const [menuOpen, setMenuOpen] = useState(false);
+  const reorderDevice = useSessionStore((s) => s.reorderDevice);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [reorder, setReorder] = useState<{ from: number; over: number } | null>(null);
 
   const chain = trackDevices[selectedTrackId] ?? [];
   const available = ALL_DEVICES.filter((d) => !chain.includes(d));
@@ -358,14 +361,52 @@ export function FXRack() {
           No devices on this track. Select a track and use “+ Add device”.
         </div>
       ) : (
-        <div className="studio-fx-grid" data-disabled={String(!fxEnabled)}>
-          {chain.map((device) => (
+        <div ref={stripRef} className="studio-fx-grid" data-disabled={String(!fxEnabled)}>
+          {chain.map((device, index) => {
+            // Where a dragged device would land, shown as a bar on the module.
+            const dropBefore = reorder !== null && reorder.over === index && reorder.from !== index;
+            const dropAfter =
+              reorder !== null && reorder.over === chain.length && index === chain.length - 1;
+            return (
             <div
               key={device}
               className="studio-fx-module"
+              data-device-index={index}
               data-off={String(!flagFor[device])}
+              data-dragging={String(reorder?.from === index)}
+              data-drop={dropBefore ? 'before' : dropAfter ? 'after' : undefined}
             >
               <div className="studio-fx-head">
+                <span
+                  className="studio-fx-grip"
+                  title="Drag to reorder"
+                  aria-label={`Drag to reorder ${DEVICE_NAMES[device]}`}
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    setReorder({ from: index, over: index });
+                  }}
+                  onPointerMove={(e) => {
+                    if (!reorder || !stripRef.current) return;
+                    // Insertion point = how many module centres sit left of the pointer.
+                    const mods = Array.from(stripRef.current.querySelectorAll<HTMLElement>('[data-device-index]'));
+                    const over = mods.filter((m) => {
+                      const r = m.getBoundingClientRect();
+                      return e.clientX > r.left + r.width / 2;
+                    }).length;
+                    if (over !== reorder.over) setReorder({ ...reorder, over });
+                  }}
+                  onPointerUp={() => {
+                    if (!reorder) return;
+                    // Removing the dragged device first shifts later positions left by one.
+                    const to = reorder.over > reorder.from ? reorder.over - 1 : reorder.over;
+                    reorderDevice(selectedTrackId, reorder.from, to);
+                    setReorder(null);
+                  }}
+                  onPointerCancel={() => setReorder(null)}
+                >
+                  ⋮⋮
+                </span>
                 <span className="studio-fx-head-dot" />
                 <span className="studio-fx-head-name">{DEVICE_NAMES[device]}</span>
                 <Switch
@@ -386,7 +427,8 @@ export function FXRack() {
               </div>
               {renderDevice(device)}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

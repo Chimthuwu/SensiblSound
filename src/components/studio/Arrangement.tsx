@@ -6,7 +6,8 @@ import { ClipWaveform } from './ClipWaveform';
 
 const BAR_W = 80;
 const BEAT_W = BAR_W / 4;
-const MIN_BARS = 16;
+const MIN_BARS = 64;
+const EXTRA_TRACK_COLORS = ['#38bdf8', '#34d399', '#fb7185', '#fbbf24', '#a3e635'];
 
 interface Clip {
   id: string;
@@ -56,6 +57,10 @@ export function Arrangement() {
   const isRecording = useSessionStore((s) => s.isRecording);
   const setSelectedMicId = useSessionStore((s) => s.setSelectedMicId);
   const markLayerDownloaded = useSessionStore((s) => s.markLayerDownloaded);
+  const extraTracks = useSessionStore((s) => s.extraTracks);
+  const addTrack = useSessionStore((s) => s.addTrack);
+  const setTrackClip = useSessionStore((s) => s.setTrackClip);
+  const [dropHover, setDropHover] = useState(false);
   const setClipStart = useSessionStore((s) => s.setClipStart);
   const [drag, setDrag] = useState<ClipDrag | null>(null);
   const setTrackVolume = useSessionStore((s) => s.setTrackVolume);
@@ -127,11 +132,30 @@ export function Arrangement() {
       });
     });
 
-    return result;
-  }, [backingTrack, activeTake, layers, msPerBar]);
+    extraTracks.forEach((t, i) => {
+      result.push({
+        id: t.id,
+        name: t.name,
+        color: EXTRA_TRACK_COLORS[i % EXTRA_TRACK_COLORS.length],
+        clips: t.clip
+          ? [{
+              id: t.clip.id,
+              name: t.clip.name,
+              startBar: toBars(t.clip.startMs) + 1,
+              lenBars: t.clip.durationMs ? toBars(t.clip.durationMs) : 4,
+              source: { url: t.clip.url, blob: t.clip.blob },
+            }]
+          : [],
+      });
+    });
 
+    return result;
+  }, [backingTrack, activeTake, layers, extraTracks, msPerBar]);
+
+  // The timeline is always long enough to scroll past the content, and grows
+  // as the content or the playhead nears its end.
   const lastBar = Math.max(0, ...lanes.flatMap((l) => l.clips.map((c) => c.startBar - 1 + c.lenBars)));
-  const bars = Math.max(MIN_BARS, Math.ceil(lastBar) + 4);
+  const bars = Math.max(MIN_BARS, Math.ceil(Math.max(lastBar, transportTimeMs / msPerBar)) + 16);
   const totalW = bars * BAR_W;
   const totalMs = bars * msPerBar;
   const progress = Math.min(1, transportTimeMs / totalMs);
@@ -196,6 +220,23 @@ export function Arrangement() {
     if (!layer) return;
     downloadBlobUrl(layer.url, buildTakeFilename(layer.timestamp, 'vocal-layer', layer.mimeType));
     markLayerDownloaded(layer.id);
+  };
+
+  const isAudioFile = (file: File) =>
+    file.type.startsWith('audio/') || /\.(wav|mp3|ogg|flac|m4a|aac|webm)$/i.test(file.name);
+  const isLayerLane = (laneId: string) => layers.some((l) => l.id === laneId);
+  const isEmptyExtraTrack = (laneId: string) => extraTracks.some((t) => t.id === laneId && !t.clip);
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
+
+  /** Dropped audio fills an empty new track, or else creates a new track. */
+  const dropAudio = (e: React.DragEvent, trackId: string | null) => {
+    e.preventDefault();
+    setDropHover(false);
+    const file = Array.from(e.dataTransfer.files).find(isAudioFile);
+    if (!file) return;
+    const clip = { name: file.name, url: URL.createObjectURL(file), blob: file };
+    if (trackId) setTrackClip(trackId, clip);
+    else addTrack(clip);
   };
 
   const selectedLane = lanes.find((l) => l.id === selectedTrackId) ?? null;
@@ -268,6 +309,14 @@ export function Arrangement() {
             <span>Tracks</span>
             <span className="studio-corner-badge">{lanes.length}</span>
           </div>
+          <button
+            className="studio-add-track"
+            type="button"
+            onClick={() => addTrack()}
+            title="Add an empty audio track"
+          >
+            + Track
+          </button>
           {lanes.map((lane) => (
             <div
               key={lane.id}
@@ -383,7 +432,7 @@ export function Arrangement() {
                       ))}
                     </select>
                   )}
-                  {lane.id !== 'backing' && lane.id !== 'active_take' && (
+                  {isLayerLane(lane.id) && (
                     <button
                       className="studio-mini-btn"
                       type="button"
@@ -396,7 +445,7 @@ export function Arrangement() {
                       Save
                     </button>
                   )}
-                  {lane.id !== 'backing' && lane.id !== 'active_take' && (
+                  {isLayerLane(lane.id) && (
                     <button
                       className="studio-mini-btn"
                       type="button"
@@ -437,6 +486,8 @@ export function Arrangement() {
               )}
             </div>
 
+            <div className="studio-add-spacer" aria-hidden="true" />
+
             <div className="studio-lanes">
               {lanes.map((lane, i) => (
                 <div
@@ -445,6 +496,12 @@ export function Arrangement() {
                   data-alt={String(i % 2 === 1)}
                   data-track={lane.id}
                   data-muted={String(mutedTracks.has(lane.id))}
+                  onDragOver={(e) => {
+                    if (isEmptyExtraTrack(lane.id) && hasFiles(e)) e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    if (isEmptyExtraTrack(lane.id)) dropAudio(e, lane.id);
+                  }}
                 >
                   {lane.clips.length === 0 && (
                     <span className="studio-lane-hint">
@@ -452,7 +509,7 @@ export function Arrangement() {
                         ? 'Import a backing track to start'
                         : lane.id === 'active_take'
                           ? 'Press record to capture a take'
-                          : ''}
+                          : isEmptyExtraTrack(lane.id) ? 'Drop audio here' : ''}
                     </span>
                   )}
                   {lane.clips.map((c) => {
@@ -469,7 +526,7 @@ export function Arrangement() {
                           left: `${(startBar - 1) * BAR_W}px`,
                           width: `${widthPx}px`,
                           borderColor: `color-mix(in srgb, ${lane.color} 58%, transparent)`,
-                          background: `linear-gradient(180deg, color-mix(in srgb, ${lane.color} 26%, #16141d), color-mix(in srgb, ${lane.color} 12%, #131118))`,
+                          background: `linear-gradient(180deg, color-mix(in srgb, ${lane.color} 26%, #302c3c), color-mix(in srgb, ${lane.color} 12%, #272332))`,
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -530,6 +587,20 @@ export function Arrangement() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div
+        className="studio-drop-zone"
+        data-hover={String(dropHover)}
+        onDragOver={(e) => {
+          if (!hasFiles(e)) return;
+          e.preventDefault();
+          setDropHover(true);
+        }}
+        onDragLeave={() => setDropHover(false)}
+        onDrop={(e) => dropAudio(e, null)}
+      >
+        <span>Drag &amp; drop audio here to create a new track</span>
       </div>
 
       <input

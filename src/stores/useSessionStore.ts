@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ALL_DEVICES, DEFAULT_EQ_BANDS, DEVICE_FLAG, type SessionState } from '../types';
+import { ALL_DEVICES, DEFAULT_EQ_BANDS, DEVICE_FLAG, type ExtraTrack, type SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
@@ -172,10 +172,62 @@ export const useSessionStore = create<SessionState>((set) => ({
         : {};
     }
     const layer = state.layers.find((l) => l.id === trackId);
-    if (!layer) return {};
-    return {
-      layers: state.layers.map((l) => (l.id === trackId ? { ...l, transportStartMs: ms } : l)),
-    };
+    if (layer) {
+      return {
+        layers: state.layers.map((l) => (l.id === trackId ? { ...l, transportStartMs: ms } : l)),
+      };
+    }
+    const track = state.extraTracks.find((t) => t.id === trackId);
+    if (track?.clip) {
+      return {
+        extraTracks: state.extraTracks.map((t) =>
+          t.id === trackId && t.clip ? { ...t, clip: { ...t.clip, startMs: ms } } : t,
+        ),
+      };
+    }
+    return {};
+  }),
+
+  extraTracks: [],
+
+  addTrack: (clip) => {
+    const id = `track-${crypto.randomUUID()}`;
+    set((state) => {
+      const name = `Track ${state.extraTracks.length + 1}`;
+      const track: ExtraTrack = clip
+        ? { id, name, clip: { id: crypto.randomUUID(), ...clip, startMs: 0 } }
+        : { id, name };
+      return {
+        extraTracks: [...state.extraTracks, track],
+        trackDevices: { ...state.trackDevices, [id]: [] },
+      };
+    });
+    return id;
+  },
+
+  setTrackClip: (trackId, clip) => set((state) => ({
+    extraTracks: state.extraTracks.map((t) =>
+      t.id === trackId && !t.clip
+        ? { ...t, clip: { id: crypto.randomUUID(), ...clip, startMs: 0 } }
+        : t,
+    ),
+  })),
+
+  setExtraTrackDuration: (trackId, durationMs) => set((state) => ({
+    extraTracks: state.extraTracks.map((t) =>
+      t.id === trackId && t.clip && t.clip.durationMs !== durationMs
+        ? { ...t, clip: { ...t.clip, durationMs } }
+        : t,
+    ),
+  })),
+
+  reorderDevice: (trackId, from, to) => set((state) => {
+    const chain = state.trackDevices[trackId] ?? [];
+    if (from === to || from < 0 || from >= chain.length) return {};
+    const next = [...chain];
+    const [moved] = next.splice(from, 1);
+    next.splice(Math.max(0, Math.min(next.length, to)), 0, moved);
+    return { trackDevices: { ...state.trackDevices, [trackId]: next } };
   }),
 
   setEqBand: (bandId, patch) => set((state) => ({

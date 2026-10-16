@@ -24,8 +24,8 @@ Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sen
 ## Next
 
 - [ ] Add and remove EQ bands (up to 8).
-- [ ] Add new tracks: "+ Track" for extra vocal takes and audio lanes.
-- [ ] Drag and drop a backing track onto the arrangement.
+- [x] Add new tracks: "+ Track" button under TRACKS, and drag & drop audio onto the empty area to create a track.
+- [x] Drag and drop audio onto the arrangement (creates a track or fills an empty one).
 - [ ] Wire the metronome and tempo controls to the transport and arrangement grid.
 - [ ] Undo / redo for edits (mute, solo, volume, devices, EQ, clip moves).
 - [ ] Project save/load: restore the arrangement from IndexedDB.
