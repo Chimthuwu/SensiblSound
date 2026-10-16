@@ -1,5 +1,7 @@
 # SensiblSound 🎙️
 
+**🔴 Live app: [sounds-sensible.pages.dev](https://sounds-sensible.pages.dev/)**
+
 A modern, browser-based vocal recording DAW designed for simplicity and speed. SensiblSound provides a classic two-track setup (Backing Track + Vocal Track) with a professional horizontal timeline interface, allowing vocalists and producers to sketch ideas, record takes, and apply high-quality DSP effects directly in the browser or on Android.
 
 ## Features ✨
@@ -14,7 +16,7 @@ A modern, browser-based vocal recording DAW designed for simplicity and speed. S
 ## Getting Started 🚀
 
 ### Web Development
-1. Clone the repository: `git clone https://github.com/Chimthuwu/SensiblSound.git`
+1. Clone the repository: `git clone https://github.com/Chimthuwu/sensible-sound.git`
 2. Install dependencies: `npm install`
 3. Start the development server: `npm run dev`
 

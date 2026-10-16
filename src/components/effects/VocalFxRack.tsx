@@ -257,7 +257,7 @@ export function VocalFxRack() {
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-sans">
               <Music size={11} className="text-primary" /> Vocals &amp; Doubler
             </span>
-            <div className="flex items-center justify-end gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               <FxToggleButton
                 enabled={fxSettings.autotuneEnabled}
                 onClick={() => setFxSettings({ autotuneEnabled: !fxSettings.autotuneEnabled })}
@@ -299,6 +299,14 @@ export function VocalFxRack() {
                 <span>Retune Speed</span>
                 <span className="font-mono text-primary font-bold">{fxSettings.autotuneSpeed}ms</span>
               </div>
+              <input
+                type="range"
+                min="0" max="100"
+                value={fxSettings.autotuneSpeed}
+                onChange={(e) => setFxSettings({ autotuneSpeed: parseInt(e.target.value) })}
+                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+              />
+            </div>
             <div>
               <div className="flex justify-between text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
                 <span>Formant Shift</span>
@@ -324,14 +332,6 @@ export function VocalFxRack() {
                 max="12"
                 value={fxSettings.pitchShiftSemitones}
                 onChange={(e) => setFxSettings({ pitchShiftSemitones: parseInt(e.target.value) })}
-                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-              />
-            </div>
-              <input
-                type="range"
-                min="0" max="100"
-                value={fxSettings.autotuneSpeed}
-                onChange={(e) => setFxSettings({ autotuneSpeed: parseInt(e.target.value) })}
                 className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
               />
             </div>
