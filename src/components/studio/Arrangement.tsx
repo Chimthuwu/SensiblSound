@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
+import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 
 const BAR_W = 80;
 const BEAT_W = BAR_W / 4;
-const BARS = 16;
-const TOTAL_W = BARS * BAR_W;
+const MIN_BARS = 16;
 
-export interface ArrangementClip {
+interface Clip {
   id: string;
   name: string;
   /** 1-based bar where the clip starts. */
@@ -15,148 +15,149 @@ export interface ArrangementClip {
   lenBars: number;
 }
 
-export interface ArrangementTrack {
+interface Lane {
+  /** Matches the id the audio engine uses for mute/solo. */
   id: string;
   name: string;
-  /** Optional secondary line for the track header, e.g. filename. */
   sub?: string;
   color: string;
-  muted: boolean;
-  soloed: boolean;
-  volume: number;
-  clips: ArrangementClip[];
+  clips: Clip[];
 }
-
-const TRACKS: ArrangementTrack[] = [
-  {
-    id: 'backing',
-    name: 'Backing Track',
-    color: '#7c3aed',
-    volume: 0.82,
-    muted: false,
-    soloed: false,
-    clips: [
-      {
-        id: 'backing-clip-1',
-        name: 'beat_final_v2',
-        startBar: 1,
-        lenBars: BARS,
-      },
-    ],
-  },
-  {
-    id: 'vocal',
-    name: 'Vocal Take 3',
-    sub: 'Sensimilliea',
-    color: '#a855f7',
-    volume: 0.78,
-    muted: false,
-    soloed: false,
-    clips: [
-      { id: 'v-1', name: 'Verse 1', startBar: 3, lenBars: 3.6 },
-      { id: 'v-2', name: 'Hook', startBar: 7, lenBars: 3.6 },
-      { id: 'v-3', name: 'Verse 2', startBar: 11, lenBars: 3.6 },
-    ],
-  },
-];
 
 export function Arrangement() {
   const backingTrack = useSessionStore((s) => s.backingTrack);
   const activeTake = useSessionStore((s) => s.activeTake);
   const layers = useSessionStore((s) => s.layers);
-  const isPlaying = useSessionStore((s) => s.isPlaying);
-
-  const transportTimeMs = useSessionStore((s) => s.transportTimeMs);
   const bpm = useSessionStore((s) => s.bpm);
+  const isPlaying = useSessionStore((s) => s.isPlaying);
+  const transportTimeMs = useSessionStore((s) => s.transportTimeMs);
+  const isMonitoring = useSessionStore((s) => s.isMonitoring);
+  const mutedTracks = useSessionStore((s) => s.mutedTracks);
+  const soloedTracks = useSessionStore((s) => s.soloedTracks);
 
-
+  const setBackingTrack = useSessionStore((s) => s.setBackingTrack);
+  const setActiveTake = useSessionStore((s) => s.setActiveTake);
+  const addLayer = useSessionStore((s) => s.addLayer);
+  const removeLayer = useSessionStore((s) => s.removeLayer);
+  const setIsMonitoring = useSessionStore((s) => s.setIsMonitoring);
   const toggleMuteTrack = useSessionStore((s) => s.toggleMuteTrack);
   const toggleSoloTrack = useSessionStore((s) => s.toggleSoloTrack);
+  const markActiveTakeDownloaded = useSessionStore((s) => s.markActiveTakeDownloaded);
 
   const tColRef = useRef<HTMLDivElement>(null);
-  const progressRef = useRef(0);
-  const rafRef = useRef<number | null>(null);
-  const lastTsRef = useRef(0);
-  const [selectedClipId, setSelectedClipId] = useState<string | null>(
-    TRACKS[1].clips[0]?.id ?? null,
-  );
+  const importRef = useRef<HTMLInputElement>(null);
+  const [selectedLaneId, setSelectedLaneId] = useState<string | null>(null);
 
+  const msPerBar = (60_000 / bpm) * 4;
 
-  const tracks: ArrangementTrack[] = useMemo(
-    () =>
-      TRACKS.map((t) => {
-        if (t.id === 'backing') {
-          return {
-            ...t,
-            name: backingTrack?.name ?? t.name,
-            sub: backingTrack?.name ?? undefined,
-          };
-        }
-        if (t.id === 'vocal') {
-          return {
-            ...t,
-            name: activeTake
-              ? `Vocal Take ${countTakes() + 1}`
-              : 'Vocal Take 1',
-            sub: activeTake ? 'Sensimilliea' : undefined,
-          };
-        }
-        return t;
-      }),
-    [backingTrack?.name, activeTake],
-  );
+  const lanes: Lane[] = useMemo(() => {
+    const toBars = (ms: number) => ms / msPerBar;
+    const takeClip = (id: string, name: string, startMs: number, durationMs?: number): Clip => ({
+      id,
+      name,
+      startBar: toBars(startMs) + 1,
+      lenBars: durationMs ? toBars(durationMs) : 1,
+    });
 
-  function countTakes() {
-    let n = 0;
-    if (activeTake) n += 1;
-    n += layers.length;
-    return n;
-  }
+    const result: Lane[] = [
+      {
+        id: 'backing',
+        name: backingTrack?.name ?? 'Backing Track',
+        color: '#7c3aed',
+        clips: backingTrack
+          ? [{
+              id: backingTrack.id,
+              name: backingTrack.name,
+              startBar: 1,
+              lenBars: backingTrack.durationMs ? toBars(backingTrack.durationMs) : 4,
+            }]
+          : [],
+      },
+      {
+        id: 'active_take',
+        name: 'Vocal Take',
+        sub: activeTake ? 'Current take' : undefined,
+        color: '#a855f7',
+        clips: activeTake
+          ? [takeClip(activeTake.id, 'Take', activeTake.transportStartMs, activeTake.durationMs)]
+          : [],
+      },
+    ];
 
-  const totalDurationMs =
-    (backingTrack?.durationMs ?? (backingTrack?.blob ? 320_000 : 0)) ||
-    (BARS * 4 * 60 * 1000) / bpm;
+    layers.forEach((layer, i) => {
+      result.push({
+        id: layer.id,
+        name: `Layer ${i + 1}`,
+        color: '#c084fc',
+        clips: [takeClip(layer.id, `Layer ${i + 1}`, layer.transportStartMs, layer.durationMs)],
+      });
+    });
 
-  const secPerBar = (60 / bpm) * 4;
-  const totalSec = BARS * secPerBar;
+    return result;
+  }, [backingTrack, activeTake, layers, msPerBar]);
 
-  const progress = isPlaying ? progressRef.current : transportTimeMs / (totalDurationMs || 1);
+  const lastBar = Math.max(0, ...lanes.flatMap((l) => l.clips.map((c) => c.startBar - 1 + c.lenBars)));
+  const bars = Math.max(MIN_BARS, Math.ceil(lastBar) + 4);
+  const totalW = bars * BAR_W;
+  const totalMs = bars * msPerBar;
+  const progress = Math.min(1, transportTimeMs / totalMs);
 
+  // Keep the playhead in view while playing.
   useEffect(() => {
-    if (!isPlaying) {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      lastTsRef.current = 0;
-      return;
-    }
-    let raf: number;
-    function tick(ts: number) {
-      if (!lastTsRef.current) lastTsRef.current = ts;
-      const dt = (ts - lastTsRef.current) / 1000;
-      lastTsRef.current = ts;
-      progressRef.current = Math.min(1, progressRef.current + dt / totalSec);
-      if (tColRef.current) {
-        const px = progressRef.current * TOTAL_W;
-        const viewL = tColRef.current.scrollLeft;
-        const viewR = viewL + tColRef.current.clientWidth;
-        if (px > viewR - 120) tColRef.current.scrollLeft = px - 120;
-        if (px < viewL) tColRef.current.scrollLeft = Math.max(0, px - 40);
-      }
-      raf = requestAnimationFrame(tick);
-    }
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(raf);
-      rafRef.current = null;
-    };
-  }, [isPlaying, totalSec]);
+    const el = tColRef.current;
+    if (!el || !isPlaying) return;
+    const px = progress * totalW;
+    const viewL = el.scrollLeft;
+    const viewR = viewL + el.clientWidth;
+    if (px > viewR - 120) el.scrollLeft = px - 120;
+    if (px < viewL) el.scrollLeft = Math.max(0, px - 40);
+  }, [progress, isPlaying, totalW]);
 
+  const handleImport = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setBackingTrack({ id: crypto.randomUUID(), name: file.name, url: URL.createObjectURL(file), blob: file });
+    }
+    // Reset so the same file can be picked again.
+    e.target.value = '';
+  };
 
-  const selectedTrackId = selectedClipId
-    ? tracks.find((t) => t.clips.some((c) => c.id === selectedClipId))?.id ?? tracks[1].id
-    : tracks[1].id;
+  const handleRecordAgain = () => {
+    if (!activeTake) return;
+    const message = activeTake.downloaded
+      ? 'Discard current take and record again?'
+      : "This take hasn't been downloaded yet — discarding it now means it's gone for good. Discard and record again?";
+    if (window.confirm(message)) setActiveTake(undefined);
+  };
+
+  const handleKeepAsLayer = () => {
+    if (!activeTake) return;
+    addLayer(activeTake);
+    setActiveTake(undefined);
+  };
+
+  const handleExport = async (format: 'wav' | 'mp3') => {
+    if (!activeTake) return;
+    let downloadUrl = activeTake.url;
+    let mimeType = activeTake.mimeType;
+    let extension: string | undefined;
+    try {
+      if (format === 'mp3') {
+        const { convertBlobToAudioBuffer, encodeMp3 } = await import('../../utils/audioEncoding');
+        const blob = activeTake.blob ?? (await (await fetch(activeTake.url)).blob());
+        const mp3 = encodeMp3(await convertBlobToAudioBuffer(blob));
+        downloadUrl = URL.createObjectURL(mp3);
+        mimeType = 'audio/mp3';
+        extension = 'mp3';
+      }
+      downloadBlobUrl(downloadUrl, buildTakeFilename(activeTake.timestamp, 'vocal-take', mimeType, extension));
+      markActiveTakeDownloaded();
+    } catch (err) {
+      console.error('Export failed', err);
+    }
+  };
+
+  const selectedLane = lanes.find((l) => l.id === selectedLaneId) ?? null;
 
   return (
     <section className="studio-card" aria-label="Arrangement">
@@ -170,26 +171,48 @@ export function Arrangement() {
           </svg>
         </span>
         <h2 className="studio-card-head-title">Arrangement</h2>
-        <span className="studio-tag">{tracks.length} track{tracks.length === 1 ? '' : 's'}</span>
+        <span className="studio-tag">{lanes.length} track{lanes.length === 1 ? '' : 's'}</span>
         <div className="studio-head-spacer" />
         <div className="studio-head-right">
-          <button className="studio-ghost-btn" type="button">
+          <button
+            className="studio-ghost-btn"
+            type="button"
+            onClick={handleRecordAgain}
+            disabled={!activeTake}
+          >
             ↺&nbsp; Record Again
           </button>
-          <button className="studio-hero-btn" type="button">
+          <button
+            className="studio-hero-btn"
+            type="button"
+            onClick={handleKeepAsLayer}
+            disabled={!activeTake}
+          >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M12 3l8 4.5-8 4.5-8-4.5L12 3z" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" />
               <path d="M4 12.5L12 17l8-4.5M4 16.5L12 21l8-4.5" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" opacity="0.6" />
             </svg>
             Keep as Layer
           </button>
-          <button className="studio-exp-btn" type="button">
+          <button
+            className="studio-exp-btn"
+            type="button"
+            onClick={() => handleExport('wav')}
+            disabled={!activeTake}
+            title="Download the current take as WAV"
+          >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M12 3v12M8 11l4 4 4-4M4 19h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             WAV
           </button>
-          <button className="studio-exp-btn" type="button">
+          <button
+            className="studio-exp-btn"
+            type="button"
+            onClick={() => handleExport('mp3')}
+            disabled={!activeTake}
+            title="Download the current take as MP3"
+          >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M12 3v12M8 11l4 4 4-4M4 19h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -202,33 +225,30 @@ export function Arrangement() {
         <div className="studio-row-heads">
           <div className="studio-corner">
             <span>Tracks</span>
-            <span className="studio-corner-badge">{tracks.length}</span>
+            <span className="studio-corner-badge">{lanes.length}</span>
           </div>
-          {tracks.map((t) => (
+          {lanes.map((lane) => (
             <div
-              key={t.id}
+              key={lane.id}
               className="studio-track-head"
-              data-selected={String(t.id === selectedTrackId)}
-              style={{ '--studio-track-color': t.color } as React.CSSProperties}
-              onClick={() => setSelectedClipId(t.clips[0]?.id ?? null)}
+              data-selected={String(lane.id === selectedLane?.id)}
+              style={{ '--studio-track-color': lane.color } as React.CSSProperties}
+              onClick={() => setSelectedLaneId(lane.id)}
             >
               <div className="studio-track-head-body">
                 <div className="studio-track-head-top">
-                  <span
-                    className="studio-track-head-dot"
-                    style={{ background: t.color }}
-                  />
+                  <span className="studio-track-head-dot" style={{ background: lane.color }} />
                   <div className="studio-track-head-name">
-                    {t.name}
-                    {t.sub ? <span className="studio-track-head-sub">{t.sub}</span> : null}
+                    {lane.name}
+                    {lane.sub ? <span className="studio-track-head-sub">{lane.sub}</span> : null}
                   </div>
                   <div className="studio-msr-group">
                     <button
                       className="studio-msr"
-                      data-state={t.muted ? 'm' : undefined}
+                      data-state={mutedTracks.has(lane.id) ? 'm' : undefined}
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleMuteTrack(t.id);
+                        toggleMuteTrack(lane.id);
                       }}
                       type="button"
                       title="Mute"
@@ -237,10 +257,10 @@ export function Arrangement() {
                     </button>
                     <button
                       className="studio-msr"
-                      data-state={t.soloed ? 's' : undefined}
+                      data-state={soloedTracks.has(lane.id) ? 's' : undefined}
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleSoloTrack(t.id);
+                        toggleSoloTrack(lane.id);
                       }}
                       type="button"
                       title="Solo"
@@ -250,106 +270,130 @@ export function Arrangement() {
                   </div>
                 </div>
                 <div className="studio-track-head-controls">
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={Math.round((t.volume ?? 0.8) * 100)}
-                    onChange={() => {
-                      /* The mockup shows per-track volume in the header,
-                         but the current store is mute/solo-centric. Keep this
-                         visual-only for the skin pass. */
-                    }}
-                    aria-label={`${t.name} volume`}
-                    readOnly
-                  />
-                  <div
-                    className="studio-track-head-knob"
-                    title="Pan"
-                    aria-hidden="true"
-                  />
+                  {lane.id === 'backing' && (
+                    <>
+                      <button
+                        className="studio-mini-btn"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          importRef.current?.click();
+                        }}
+                      >
+                        {backingTrack ? 'Replace' : 'Import audio'}
+                      </button>
+                      {backingTrack && (
+                        <button
+                          className="studio-mini-btn"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBackingTrack(undefined);
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {lane.id === 'active_take' && (
+                    <button
+                      className="studio-mini-btn"
+                      type="button"
+                      data-on={String(isMonitoring)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsMonitoring(!isMonitoring);
+                      }}
+                      title="Hear your mic with the FX applied"
+                    >
+                      {isMonitoring ? 'Monitoring' : 'Monitor'}
+                    </button>
+                  )}
+                  {lane.id !== 'backing' && lane.id !== 'active_take' && (
+                    <button
+                      className="studio-mini-btn"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeLayer(lane.id);
+                      }}
+                      title="Delete this layer"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
-              </div>
-              <div className="studio-track-head-meter">
-                <span data-meter-fill style={{ height: '50%' }} />
               </div>
             </div>
           ))}
         </div>
 
         <div className="studio-timeline-col" ref={tColRef}>
-          <div className="studio-timeline-inner" style={{ width: TOTAL_W }}>
+          <div className="studio-timeline-inner" style={{ width: totalW }}>
             <div className="studio-ruler">
-              <div
-                className="studio-ruler-loop"
-                style={{ left: 0, width: TOTAL_W }}
-              />
-              {Array.from({ length: BARS }).map((_, b) => {
-                const x = b * BAR_W;
-                return (
-                  <div key={b} className="studio-tick" data-major="true" style={{ left: x }}>
-                    <span className="studio-tick-label">{b + 1}</span>
-                  </div>
-                );
-              })}
-              {Array.from({ length: BARS }).flatMap((_, b) =>
-                Array.from({ length: 3 }).map((_, k) => {
-                  const x = b * BAR_W + (k + 1) * BEAT_W;
-                  return (
-                    <div
-                      key={`beat-${b}-${k}`}
-                      className="studio-tick"
-                      data-beat="True"
-                      style={{ left: x }}
-                    />
-                  );
-                }),
+              <div className="studio-ruler-loop" style={{ left: 0, width: totalW }} />
+              {Array.from({ length: bars }).map((_, b) => (
+                <div key={b} className="studio-tick" data-major="true" style={{ left: b * BAR_W }}>
+                  <span className="studio-tick-label">{b + 1}</span>
+                </div>
+              ))}
+              {Array.from({ length: bars }).flatMap((_, b) =>
+                Array.from({ length: 3 }).map((_, k) => (
+                  <div
+                    key={`beat-${b}-${k}`}
+                    className="studio-tick"
+                    data-beat="True"
+                    style={{ left: b * BAR_W + (k + 1) * BEAT_W }}
+                  />
+                )),
               )}
             </div>
 
             <div className="studio-lanes">
-              {tracks.map((t, i) => (
+              {lanes.map((lane, i) => (
                 <div
-                  key={t.id}
+                  key={lane.id}
                   className="studio-lane"
                   data-alt={String(i % 2 === 1)}
-                  data-track={t.id}
+                  data-track={lane.id}
+                  data-muted={String(mutedTracks.has(lane.id))}
                 >
-                  {t.clips.map((c) => {
-                    const leftPx = (c.startBar - 1) * BAR_W;
-                    const widthPx = c.lenBars * BAR_W;
-                    const selected =
-                      selectedClipId !== null && selectedClipId === c.id;
-                    return (
-                      <div
-                        key={c.id}
-                        className="studio-clip"
-                        data-selected={String(selected)}
-                        style={{
-                          left: `${leftPx}px`,
-                          width: `${widthPx}px`,
-                          borderColor: `color-mix(in srgb, ${t.color} 58%, transparent)`,
-                          background: `linear-gradient(180deg, color-mix(in srgb, ${t.color} 26%, #16141d), color-mix(in srgb, ${t.color} 12%, #131118))`,
-                        }}
-                        onClick={(_e) => {
-                          _e.stopPropagation();
-                          setSelectedClipId(c.id);
-                        }}
-                      >
-                        <span className="studio-clip-name">{c.name}</span>
-                        {/* Placeholder waveform canvas for the skin. Real audio is
-                            rendered through the existing WaveSurfer-backed tracks below. */}
-                        <canvas className="studio-clip-wave" aria-hidden="true" />
-                      </div>
-                    );
-                  })}
+                  {lane.clips.length === 0 && (
+                    <span className="studio-lane-hint">
+                      {lane.id === 'backing'
+                        ? 'Import a backing track to start'
+                        : lane.id === 'active_take'
+                          ? 'Press record to capture a take'
+                          : ''}
+                    </span>
+                  )}
+                  {lane.clips.map((c) => (
+                    <div
+                      key={c.id}
+                      className="studio-clip"
+                      data-selected={String(selectedLaneId === lane.id)}
+                      style={{
+                        left: `${(c.startBar - 1) * BAR_W}px`,
+                        width: `${c.lenBars * BAR_W}px`,
+                        borderColor: `color-mix(in srgb, ${lane.color} 58%, transparent)`,
+                        background: `linear-gradient(180deg, color-mix(in srgb, ${lane.color} 26%, #16141d), color-mix(in srgb, ${lane.color} 12%, #131118))`,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLaneId(lane.id);
+                      }}
+                    >
+                      <span className="studio-clip-name">{c.name}</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
 
             <div
               className="studio-playhead"
-              style={{ left: `${Math.min(1, progress) * TOTAL_W}px` }}
+              style={{ left: `${progress * totalW}px` }}
               aria-hidden="true"
             >
               <span className="studio-playhead-arrow" />
@@ -357,6 +401,15 @@ export function Arrangement() {
           </div>
         </div>
       </div>
+
+      <input
+        ref={importRef}
+        type="file"
+        accept="audio/mpeg, audio/wav, .mp3, .wav"
+        onChange={handleImport}
+        style={{ display: 'none' }}
+        aria-label="Import backing track"
+      />
     </section>
   );
 }
