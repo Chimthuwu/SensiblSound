@@ -203,6 +203,8 @@
 }
 .studio-ghost-btn:hover { border-color: theme("colors.primary"); color: #fff; background: rgba(168, 85, 247, 0.12); }
 .studio-ghost-btn:disabled, .studio-hero-btn:disabled, .studio-exp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.studio-track-head-controls { flex-wrap: wrap; row-gap: 6px; }
+.studio-track-head-controls input[type=range] { flex-basis: 100%; }
 .studio-mini-btn {
   padding: 3px 8px;
   border-radius: 6px;
@@ -545,6 +547,10 @@
   transition: opacity 0.2s, filter 0.2s;
 }
 .studio-fx-grid[data-disabled="true"] { opacity: 0.32; filter: grayscale(0.75); pointer-events: none; }
+/* Arrangement takes the free height so the device rack sits just above the transport. */
+.studio > .studio-card:first-child { flex: 1 1 auto; }
+.studio-device-menu { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.studio-fx-empty { padding: 22px 16px; font-size: 12px; color: #5f5870; text-align: center; }
 
 .studio-fx-module {
   background: linear-gradient(180deg, #171320, #131020);

@@ -65,6 +65,20 @@ export interface FxSettings {
   micGain: number;
 }
 
+export type DeviceId = 'autotune' | 'doubler' | 'compressor' | 'eq' | 'delay' | 'reverb';
+
+export const ALL_DEVICES: DeviceId[] = ['autotune', 'doubler', 'compressor', 'eq', 'delay', 'reverb'];
+
+// Which fxSettings flag each device switches on and off.
+export const DEVICE_FLAG: Record<DeviceId, keyof FxSettings> = {
+  autotune: 'autotuneEnabled',
+  doubler: 'doubleEnabled',
+  compressor: 'compressorEnabled',
+  eq: 'eqEnabled',
+  delay: 'delayEnabled',
+  reverb: 'reverbEnabled',
+};
+
 export interface SessionState {
   bpm: number;
   backingTrack?: AudioFile;
@@ -88,6 +102,17 @@ export interface SessionState {
   recordingsHistory: RecordingMeta[]; // Every recording ever made this browser, independent of the active session
   mutedTracks: Set<string>;
   soloedTracks: Set<string>;
+  // Per-track playback volume, 0..1. Missing keys mean 1 (full volume).
+  trackVolumes: Record<string, number>;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  // The track whose device chain the FX rack is showing.
+  selectedTrackId: string;
+  setSelectedTrackId: (trackId: string) => void;
+  // Ordered device chain per track. Adding/removing a device also turns its
+  // effect on/off in fxSettings.
+  trackDevices: Record<string, DeviceId[]>;
+  addDevice: (trackId: string, device: DeviceId) => void;
+  removeDevice: (trackId: string, device: DeviceId) => void;
 
   // Actions
   setBpm: (bpm: number) => void;

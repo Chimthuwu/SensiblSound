@@ -17,12 +17,14 @@ function HeadlessPlayer({
   blob,
   startOffsetMs = 0,
   forceMute,
+  volume,
   onDuration,
 }: {
   url?: string;
   blob?: Blob;
   startOffsetMs?: number;
   forceMute?: boolean;
+  volume?: number;
   onDuration?: (ms: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -31,6 +33,7 @@ function HeadlessPlayer({
     startOffsetMs,
     interactive: false,
     forceMute,
+    volume,
   });
 
   // Keep the callback in a ref so an unstable identity (e.g. an inline arrow
@@ -78,6 +81,7 @@ export function AudioEngine() {
   const activeTake = useSessionStore((s) => s.activeTake);
   const layers = useSessionStore((s) => s.layers);
   const mutedTracks = useSessionStore((s) => s.mutedTracks);
+  const trackVolumes = useSessionStore((s) => s.trackVolumes);
   const soloedTracks = useSessionStore((s) => s.soloedTracks);
   const setBackingTrackDurationMs = useSessionStore((s) => s.setBackingTrackDurationMs);
   const setActiveTakeDurationMs = useSessionStore((s) => s.setActiveTakeDurationMs);
@@ -95,6 +99,7 @@ export function AudioEngine() {
           url={backingTrack.url}
           blob={backingTrack.blob}
           forceMute={isSilenced('backing')}
+          volume={trackVolumes['backing'] ?? 1}
           onDuration={setBackingTrackDurationMs}
         />
       )}
@@ -104,18 +109,20 @@ export function AudioEngine() {
           url={activeTake.url}
           blob={activeTake.blob}
           startOffsetMs={activeTake.transportStartMs}
-          forceMute={isSilenced('vocal')}
+          forceMute={isSilenced('active_take')}
+          volume={trackVolumes['active_take'] ?? 1}
           onDuration={setActiveTakeDurationMs}
         />
       )}
 
-      {layers.map((layer, index) => (
+      {layers.map((layer) => (
         <HeadlessPlayer
           key={layer.id}
           url={layer.url}
           blob={layer.blob}
           startOffsetMs={layer.transportStartMs}
-          forceMute={isSilenced(`layer-${index}`)}
+          forceMute={isSilenced(layer.id)}
+          volume={trackVolumes[layer.id] ?? 1}
           onDuration={(ms) => setLayerDurationMs(layer.id, ms)}
         />
       ))}

@@ -11,6 +11,8 @@ export interface AudioPlayerOptions {
   blob?: Blob;
   /** Force mute state, ignoring local isMuted. Used for global solo/mute functionality */
   forceMute?: boolean;
+  /** Track volume, 0..1. Overrides the hook's local volume when set. */
+  volume?: number;
 }
 
 export function useAudioPlayer(
@@ -128,8 +130,8 @@ export function useAudioPlayer(
   useEffect(() => {
     if (!wavesurfer.current) return;
     const effectivelyMuted = options?.forceMute || isMuted;
-    wavesurfer.current.setVolume(effectivelyMuted ? 0 : volume);
-  }, [volume, isMuted, options?.forceMute]);
+    wavesurfer.current.setVolume(effectivelyMuted ? 0 : (options?.volume ?? volume));
+  }, [volume, isMuted, options?.forceMute, options?.volume]);
 
   // THE main sync effect: offset-aware seeking + play/pause windowing.
   //

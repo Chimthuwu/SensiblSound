@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, type ChangeEvent } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 
@@ -34,6 +34,8 @@ export function Arrangement() {
   const isMonitoring = useSessionStore((s) => s.isMonitoring);
   const mutedTracks = useSessionStore((s) => s.mutedTracks);
   const soloedTracks = useSessionStore((s) => s.soloedTracks);
+  const trackVolumes = useSessionStore((s) => s.trackVolumes);
+  const setTrackVolume = useSessionStore((s) => s.setTrackVolume);
 
   const setBackingTrack = useSessionStore((s) => s.setBackingTrack);
   const setActiveTake = useSessionStore((s) => s.setActiveTake);
@@ -46,7 +48,8 @@ export function Arrangement() {
 
   const tColRef = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
-  const [selectedLaneId, setSelectedLaneId] = useState<string | null>(null);
+  const selectedTrackId = useSessionStore((s) => s.selectedTrackId);
+  const setSelectedTrackId = useSessionStore((s) => s.setSelectedTrackId);
 
   const msPerBar = (60_000 / bpm) * 4;
 
@@ -157,7 +160,7 @@ export function Arrangement() {
     }
   };
 
-  const selectedLane = lanes.find((l) => l.id === selectedLaneId) ?? null;
+  const selectedLane = lanes.find((l) => l.id === selectedTrackId) ?? null;
 
   return (
     <section className="studio-card" aria-label="Arrangement">
@@ -233,7 +236,7 @@ export function Arrangement() {
               className="studio-track-head"
               data-selected={String(lane.id === selectedLane?.id)}
               style={{ '--studio-track-color': lane.color } as React.CSSProperties}
-              onClick={() => setSelectedLaneId(lane.id)}
+              onClick={() => setSelectedTrackId(lane.id)}
             >
               <div className="studio-track-head-body">
                 <div className="studio-track-head-top">
@@ -270,6 +273,16 @@ export function Arrangement() {
                   </div>
                 </div>
                 <div className="studio-track-head-controls">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round((trackVolumes[lane.id] ?? 1) * 100)}
+                    onChange={(e) => setTrackVolume(lane.id, Number(e.target.value) / 100)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`${lane.name} volume`}
+                    title="Volume"
+                  />
                   {lane.id === 'backing' && (
                     <>
                       <button
@@ -372,7 +385,7 @@ export function Arrangement() {
                     <div
                       key={c.id}
                       className="studio-clip"
-                      data-selected={String(selectedLaneId === lane.id)}
+                      data-selected={String(selectedTrackId === lane.id)}
                       style={{
                         left: `${(c.startBar - 1) * BAR_W}px`,
                         width: `${c.lenBars * BAR_W}px`,
@@ -381,7 +394,7 @@ export function Arrangement() {
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedLaneId(lane.id);
+                        setSelectedTrackId(lane.id);
                       }}
                     >
                       <span className="studio-clip-name">{c.name}</span>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SessionState } from '../types';
+import { ALL_DEVICES, DEVICE_FLAG, type SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
@@ -28,6 +28,9 @@ export const useSessionStore = create<SessionState>((set) => ({
   recordingsHistory: recordingHistoryIndex.list(),
   mutedTracks: new Set(),
   soloedTracks: new Set(),
+  trackVolumes: {},
+  selectedTrackId: 'active_take',
+  trackDevices: { active_take: ALL_DEVICES },
   fxSettings: {
     autotuneEnabled: false,
     compressorEnabled: false,
@@ -144,6 +147,30 @@ export const useSessionStore = create<SessionState>((set) => ({
       newMuted.add(trackId);
     }
     return { mutedTracks: newMuted };
+  }),
+
+  setTrackVolume: (trackId, volume) => set((state) => ({
+    trackVolumes: { ...state.trackVolumes, [trackId]: Math.max(0, Math.min(1, volume)) },
+  })),
+
+  setSelectedTrackId: (trackId) => set({ selectedTrackId: trackId }),
+
+  addDevice: (trackId, device) => set((state) => {
+    const chain = state.trackDevices[trackId] ?? [];
+    if (chain.includes(device)) return {};
+    return {
+      trackDevices: { ...state.trackDevices, [trackId]: [...chain, device] },
+      fxSettings: { ...state.fxSettings, [DEVICE_FLAG[device]]: true },
+    };
+  }),
+
+  removeDevice: (trackId, device) => set((state) => {
+    const chain = state.trackDevices[trackId] ?? [];
+    if (!chain.includes(device)) return {};
+    return {
+      trackDevices: { ...state.trackDevices, [trackId]: chain.filter((d) => d !== device) },
+      fxSettings: { ...state.fxSettings, [DEVICE_FLAG[device]]: false },
+    };
   }),
 
   toggleSoloTrack: (trackId) => set((state) => {
