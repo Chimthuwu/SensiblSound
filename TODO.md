@@ -1,0 +1,56 @@
+# SensiblSound — TODO
+
+Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sensible.pages.dev/ (repo: `Chimthuwu/sensible-sound`).
+
+## Status (2026-10-16)
+
+- Studio skin is the main UI. Open as **PR #1** (`feat/studio-skin`).
+- Arrangement is driven by real session state: backing track, active take, layers.
+- Per-track volume sliders, mute/solo, and per-track device chains (add/remove) are in.
+- Devices rack sits at the bottom, above the transport.
+- Four-band parametric EQ (shelf / peak / peak / shelf) with a real curve. Local commit `6a4ea34`, not pushed yet.
+- Build passes (`npm run build`). **Nothing has been tested with a real microphone or with file import yet.**
+
+## Now
+
+- [ ] Manual test pass: import a backing track, record a take, monitor, playback, mute/solo, volume, Keep as Layer, Record Again, WAV/MP3 export, EQ drag, device add/remove.
+- [ ] Push `6a4ea34` (EQ) and the device-chain commits to `feat/studio-skin`.
+- [ ] Microphone selector: move device list and selection into the store. `useAudioRecorder` currently keeps this per instance, so it can't be shared yet.
+- [ ] Per-track effects: route each track through its own device chain. Today the effect graph is global and only affects mic recording.
+- [ ] Clip waveforms in the arrangement (currently empty blocks).
+- [ ] Per-layer download (only the active take can be exported).
+- [ ] Real compressor ratio control (the Ratio knob was removed because it did nothing).
+
+## Next
+
+- [ ] Add and remove EQ bands (up to 8).
+- [ ] Add new tracks: "+ Track" for extra vocal takes and audio lanes.
+- [ ] Drag and drop a backing track onto the arrangement.
+- [ ] Wire the metronome and tempo controls to the transport and arrangement grid.
+- [ ] Undo / redo for edits (mute, solo, volume, devices, EQ, clip moves).
+- [ ] Project save/load: restore the arrangement from IndexedDB.
+- [ ] Timeline zoom and horizontal scrolling for long arrangements.
+- [ ] Delete the old `src/components/tracks/` UI once nothing needs it for reference.
+
+## Later (toward a full web DAW)
+
+- [ ] Track types beyond vocals: audio, instrument (MIDI), and sampler.
+- [ ] Device chain engine on AudioWorklet, so effects are real per-track DSP.
+- [ ] Full mixdown export of the arrangement (not just the active take).
+- [ ] Automation lanes for volume, pan and effect parameters.
+- [ ] Punch-in recording and multi-take comping.
+- [ ] Cloud sync and sharing (Drive / Firebase backends already exist in the code).
+
+## Open questions
+
+- Delete the old `sensiblsound.pages.dev` Cloudflare project now that `sounds-sensible` is live?
+- Set the GitHub repo homepage to the live URL?
+- Should the backing track get its own device chain? That needs per-track routing first.
+- Merge PR #1 once the manual test pass is done?
+- Ratio: do we want a real compressor ratio, or remove the Dynamics module's ratio entirely?
+
+## Handoff notes
+
+- Branch `feat/studio-skin` is the working branch; `main` is the old UI.
+- `src/components/studio/` is the live UI. `src/components/tracks/*` is the old UI and nothing imports it any more. `effects/` (old VocalFxRack) was removed.
+- Headless Edge screenshots work for layout checks (`msedge --headless=new --screenshot`). Mic and file import do not.
