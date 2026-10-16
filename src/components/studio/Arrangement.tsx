@@ -412,7 +412,8 @@ export function Arrangement() {
         </div>
 
         <div className="studio-timeline-col" ref={tColRef}>
-          <div className="studio-timeline-inner" style={{ width: totalW }}>
+          {/* At least as wide as the panel, so the grid fills the empty space to the right. */}
+          <div className="studio-timeline-inner" style={{ width: totalW, minWidth: '100%' }}>
             <div className="studio-ruler">
               <div className="studio-ruler-loop" style={{ left: 0, width: totalW }} />
               {Array.from({ length: bars }).map((_, b) => (
