@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { Activity } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 import { ClipWaveform } from './ClipWaveform';
@@ -355,9 +356,12 @@ export function Arrangement() {
                         e.stopPropagation();
                         setIsMonitoring(!isMonitoring);
                       }}
-                      title="Hear your mic with the FX applied"
+                      title={isMonitoring ? 'Monitoring: hearing your mic with FX (click to stop)' : 'Monitor: hear your mic with FX'}
+                      aria-label={isMonitoring ? 'Stop monitoring' : 'Start monitoring'}
+                      aria-pressed={isMonitoring}
                     >
-                      {isMonitoring ? 'Monitoring' : 'Monitor'}
+                      <Activity size={12} className={isMonitoring ? 'animate-pulse' : undefined} />
+                      {/* Icon only: the mic picker needs the width. */}
                     </button>
                   )}
                   {lane.id === 'active_take' && (
