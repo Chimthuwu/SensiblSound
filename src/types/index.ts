@@ -4,6 +4,7 @@ export interface AudioFile {
   url: string; // Object URL for playback
   blob?: Blob; // Actual file/blob for robust loading
   durationMs?: number; // Populated once WaveSurfer decodes the audio
+  startMs?: number; // Where the track starts on the timeline (default 0)
 }
 
 export interface VocalTake {
@@ -130,6 +131,8 @@ export interface SessionState {
   selectedTrackId: string;
   setSelectedTrackId: (trackId: string) => void;
   setEqBand: (bandId: string, patch: Partial<Omit<EqBand, 'id'>>) => void;
+  // Move a clip on the timeline. trackId is a lane id: 'backing', 'active_take' or a layer id.
+  setClipStart: (trackId: string, startMs: number) => void;
   // Ordered device chain per track. Adding/removing a device also turns its
   // effect on/off in fxSettings.
   trackDevices: Record<string, DeviceId[]>;

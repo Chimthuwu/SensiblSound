@@ -98,6 +98,7 @@ export function AudioEngine() {
         <HeadlessPlayer
           url={backingTrack.url}
           blob={backingTrack.blob}
+          startOffsetMs={backingTrack.startMs ?? 0}
           forceMute={isSilenced('backing')}
           volume={trackVolumes['backing'] ?? 1}
           onDuration={setBackingTrackDurationMs}

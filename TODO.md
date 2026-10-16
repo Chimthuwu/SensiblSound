@@ -17,7 +17,7 @@ Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sen
 - [x] Push `6a4ea34` (EQ) and the device-chain commits to `feat/studio-skin` (pushed with PR #1).
 - [x] Microphone selector in the Vocal Take header (device list and selection now live in the store).
 - [ ] Per-track effects: route each track through its own device chain. Today the effect graph is global and only affects mic recording.
-- [ ] Clip waveforms in the arrangement (currently empty blocks).
+- [x] Clip waveforms in the arrangement (decoded peaks, cached per clip; untested with real audio).
 - [x] Per-layer download (Save button on each layer).
 - [ ] Real compressor ratio control (the Ratio knob was removed because it did nothing).
 

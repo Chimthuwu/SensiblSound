@@ -159,6 +159,25 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   setSelectedTrackId: (trackId) => set({ selectedTrackId: trackId }),
 
+  setClipStart: (trackId, startMs) => set((state) => {
+    const ms = Math.max(0, Math.round(startMs));
+    if (trackId === 'backing') {
+      return state.backingTrack
+        ? { backingTrack: { ...state.backingTrack, startMs: ms } }
+        : {};
+    }
+    if (trackId === 'active_take') {
+      return state.activeTake
+        ? { activeTake: { ...state.activeTake, transportStartMs: ms } }
+        : {};
+    }
+    const layer = state.layers.find((l) => l.id === trackId);
+    if (!layer) return {};
+    return {
+      layers: state.layers.map((l) => (l.id === trackId ? { ...l, transportStartMs: ms } : l)),
+    };
+  }),
+
   setEqBand: (bandId, patch) => set((state) => ({
     fxSettings: {
       ...state.fxSettings,

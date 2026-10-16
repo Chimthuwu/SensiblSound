@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
+import { ClipWaveform } from './ClipWaveform';
 
 const BAR_W = 80;
 const BEAT_W = BAR_W / 4;
@@ -13,7 +14,20 @@ interface Clip {
   startBar: number;
   /** Length in bars (supports fractional). */
   lenBars: number;
+  /** Audio behind the clip, used for its waveform. */
+  source?: { url: string; blob?: Blob };
 }
+
+interface ClipDrag {
+  laneId: string;
+  clipId: string;
+  startX: number;
+  origBar: number;
+  deltaBars: number;
+}
+
+// Clips snap to quarter bars (one beat at 4/4).
+const SNAP_BARS = 0.25;
 
 interface Lane {
   /** Matches the id the audio engine uses for mute/solo. */
@@ -41,6 +55,8 @@ export function Arrangement() {
   const isRecording = useSessionStore((s) => s.isRecording);
   const setSelectedMicId = useSessionStore((s) => s.setSelectedMicId);
   const markLayerDownloaded = useSessionStore((s) => s.markLayerDownloaded);
+  const setClipStart = useSessionStore((s) => s.setClipStart);
+  const [drag, setDrag] = useState<ClipDrag | null>(null);
   const setTrackVolume = useSessionStore((s) => s.setTrackVolume);
 
   const setBackingTrack = useSessionStore((s) => s.setBackingTrack);
@@ -61,11 +77,18 @@ export function Arrangement() {
 
   const lanes: Lane[] = useMemo(() => {
     const toBars = (ms: number) => ms / msPerBar;
-    const takeClip = (id: string, name: string, startMs: number, durationMs?: number): Clip => ({
+    const takeClip = (
+      id: string,
+      name: string,
+      startMs: number,
+      durationMs: number | undefined,
+      source: { url: string; blob?: Blob },
+    ): Clip => ({
       id,
       name,
       startBar: toBars(startMs) + 1,
       lenBars: durationMs ? toBars(durationMs) : 1,
+      source,
     });
 
     const result: Lane[] = [
@@ -77,8 +100,9 @@ export function Arrangement() {
           ? [{
               id: backingTrack.id,
               name: backingTrack.name,
-              startBar: 1,
+              startBar: toBars(backingTrack.startMs ?? 0) + 1,
               lenBars: backingTrack.durationMs ? toBars(backingTrack.durationMs) : 4,
+              source: { url: backingTrack.url, blob: backingTrack.blob },
             }]
           : [],
       },
@@ -88,7 +112,7 @@ export function Arrangement() {
         sub: activeTake ? 'Current take' : undefined,
         color: '#a855f7',
         clips: activeTake
-          ? [takeClip(activeTake.id, 'Take', activeTake.transportStartMs, activeTake.durationMs)]
+          ? [takeClip(activeTake.id, 'Take', activeTake.transportStartMs, activeTake.durationMs, { url: activeTake.url, blob: activeTake.blob })]
           : [],
       },
     ];
@@ -98,7 +122,7 @@ export function Arrangement() {
         id: layer.id,
         name: `Layer ${i + 1}`,
         color: '#c084fc',
-        clips: [takeClip(layer.id, `Layer ${i + 1}`, layer.transportStartMs, layer.durationMs)],
+        clips: [takeClip(layer.id, `Layer ${i + 1}`, layer.transportStartMs, layer.durationMs, { url: layer.url, blob: layer.blob })],
       });
     });
 
@@ -426,25 +450,68 @@ export function Arrangement() {
                           : ''}
                     </span>
                   )}
-                  {lane.clips.map((c) => (
-                    <div
-                      key={c.id}
-                      className="studio-clip"
-                      data-selected={String(selectedTrackId === lane.id)}
-                      style={{
-                        left: `${(c.startBar - 1) * BAR_W}px`,
-                        width: `${c.lenBars * BAR_W}px`,
-                        borderColor: `color-mix(in srgb, ${lane.color} 58%, transparent)`,
-                        background: `linear-gradient(180deg, color-mix(in srgb, ${lane.color} 26%, #16141d), color-mix(in srgb, ${lane.color} 12%, #131118))`,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedTrackId(lane.id);
-                      }}
-                    >
-                      <span className="studio-clip-name">{c.name}</span>
-                    </div>
-                  ))}
+                  {lane.clips.map((c) => {
+                    const dragging = drag?.clipId === c.id;
+                    const startBar = c.startBar + (dragging ? drag.deltaBars : 0);
+                    const widthPx = c.lenBars * BAR_W;
+                    return (
+                      <div
+                        key={c.id}
+                        className="studio-clip"
+                        data-selected={String(selectedTrackId === lane.id)}
+                        data-dragging={String(dragging)}
+                        style={{
+                          left: `${(startBar - 1) * BAR_W}px`,
+                          width: `${widthPx}px`,
+                          borderColor: `color-mix(in srgb, ${lane.color} 58%, transparent)`,
+                          background: `linear-gradient(180deg, color-mix(in srgb, ${lane.color} 26%, #16141d), color-mix(in srgb, ${lane.color} 12%, #131118))`,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTrackId(lane.id);
+                        }}
+                        onPointerDown={(e) => {
+                          if (e.button !== 0) return;
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                          setDrag({
+                            laneId: lane.id,
+                            clipId: c.id,
+                            startX: e.clientX,
+                            origBar: c.startBar,
+                            deltaBars: 0,
+                          });
+                        }}
+                        onPointerMove={(e) => {
+                          if (!drag || drag.clipId !== c.id) return;
+                          const raw = (e.clientX - drag.startX) / BAR_W;
+                          const snapped = Math.round(raw / SNAP_BARS) * SNAP_BARS;
+                          // Never move a clip before the start of the timeline.
+                          const deltaBars = Math.max(1 - drag.origBar, snapped);
+                          if (deltaBars !== drag.deltaBars) setDrag({ ...drag, deltaBars });
+                        }}
+                        onPointerUp={(e) => {
+                          if (!drag || drag.clipId !== c.id) return;
+                          e.currentTarget.releasePointerCapture(e.pointerId);
+                          if (drag.deltaBars !== 0) {
+                            const newStartMs = (drag.origBar - 1 + drag.deltaBars) * msPerBar;
+                            setClipStart(drag.laneId, newStartMs);
+                          }
+                          setDrag(null);
+                        }}
+                        onPointerCancel={() => setDrag(null)}
+                      >
+                        {c.source && (
+                          <ClipWaveform
+                            cacheKey={c.id}
+                            source={c.source}
+                            color={lane.color}
+                            width={Math.round(widthPx)}
+                          />
+                        )}
+                        <span className="studio-clip-name">{c.name}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
