@@ -92,9 +92,7 @@ export function useAudioRecorder() {
     // All nodes default to null. We only assign a node when its FX toggle is on,
     // and the cleanup function below safely no-ops on null references.
     let compressor: DynamicsCompressorNode | null = null;
-    let lowShelf: BiquadFilterNode | null = null;
-    let midPeaking: BiquadFilterNode | null = null;
-    let highShelf: BiquadFilterNode | null = null;
+    let eqFilters: BiquadFilterNode[] = [];
     let waveshaper: WaveShaperNode | null = null;
 
     let pitchShifter: DelayNode | null = null;
@@ -222,28 +220,20 @@ export function useAudioRecorder() {
           prev = compressor;
         }
 
-        // 2. Parametric EQ (Low, Mid, High) — gated by eqEnabled
+        // 2. Parametric EQ — one biquad per band, in order. Gated by eqEnabled.
         if (fxSettings.eqEnabled) {
-          lowShelf = audioCtx.createBiquadFilter();
-          lowShelf.type = 'lowshelf';
-          lowShelf.frequency.value = 150;
-          lowShelf.gain.value = fxSettings.eqLow;
-
-          midPeaking = audioCtx.createBiquadFilter();
-          midPeaking.type = 'peaking';
-          midPeaking.frequency.value = 1200;
-          midPeaking.Q.value = 1.2;
-          midPeaking.gain.value = fxSettings.eqMid;
-
-          highShelf = audioCtx.createBiquadFilter();
-          highShelf.type = 'highshelf';
-          highShelf.frequency.value = 4000;
-          highShelf.gain.value = fxSettings.eqHigh;
-
-          prev.connect(lowShelf);
-          lowShelf.connect(midPeaking);
-          midPeaking.connect(highShelf);
-          prev = highShelf;
+          eqFilters = fxSettings.eqBands.map((band) => {
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = band.type === 'peak' ? 'peaking' : band.type;
+            filter.frequency.value = band.freq;
+            filter.gain.value = band.gain;
+            filter.Q.value = band.q;
+            return filter;
+          });
+          for (const filter of eqFilters) {
+            prev.connect(filter);
+            prev = filter;
+          }
         }
 
         // 3. Autotune (saturation + pitch-shift) — gated by autotuneEnabled
@@ -444,9 +434,7 @@ export function useAudioRecorder() {
       if (source) source.disconnect();
       if (inputGainNode) inputGainNode.disconnect();
       if (compressor) compressor.disconnect();
-      if (lowShelf) lowShelf.disconnect();
-      if (midPeaking) midPeaking.disconnect();
-      if (highShelf) highShelf.disconnect();
+      for (const filter of eqFilters) filter.disconnect();
       if (waveshaper) waveshaper.disconnect();
       if (pitchShifter) pitchShifter.disconnect();
       if (analyser) analyser.disconnect();

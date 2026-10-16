@@ -40,6 +40,22 @@ export interface RecordingMeta {
   mimeType?: string;
 }
 
+// One band of the parametric EQ. Maps 1:1 onto a Web Audio BiquadFilterNode.
+export interface EqBand {
+  id: string;
+  type: 'lowshelf' | 'peak' | 'highshelf';
+  freq: number; // Hz, 20..20000
+  gain: number; // dB, -12..12
+  q: number; // peaks only (shelves ignore Q in Web Audio)
+}
+
+export const DEFAULT_EQ_BANDS: EqBand[] = [
+  { id: 'b1', type: 'lowshelf', freq: 100, gain: 0, q: 0.7 },
+  { id: 'b2', type: 'peak', freq: 400, gain: 0, q: 1 },
+  { id: 'b3', type: 'peak', freq: 2500, gain: 0, q: 1 },
+  { id: 'b4', type: 'highshelf', freq: 8000, gain: 0, q: 0.7 },
+];
+
 export interface FxSettings {
   autotuneEnabled: boolean;
   compressorEnabled: boolean;
@@ -55,9 +71,7 @@ export interface FxSettings {
   compression: number;
   doubleEnabled: boolean;
   doubleWidth: number;
-  eqLow: number;
-  eqMid: number;
-  eqHigh: number;
+  eqBands: EqBand[];
   delayFeedback: number;
   delayTime: number;
   reverbWet: number;
@@ -108,6 +122,7 @@ export interface SessionState {
   // The track whose device chain the FX rack is showing.
   selectedTrackId: string;
   setSelectedTrackId: (trackId: string) => void;
+  setEqBand: (bandId: string, patch: Partial<Omit<EqBand, 'id'>>) => void;
   // Ordered device chain per track. Adding/removing a device also turns its
   // effect on/off in fxSettings.
   trackDevices: Record<string, DeviceId[]>;

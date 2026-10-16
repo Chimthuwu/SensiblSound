@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { ALL_DEVICES, type DeviceId } from '../../types';
 import { Knob } from './Knob';
-import { ParametricEQ, type EQBand } from './ParametricEQ';
+import { ParametricEQ } from './ParametricEQ';
 
 // All twelve keys — the audio graph maps the note name through a 12-entry
 // table, so a short list silently made G# and A# unselectable.
@@ -106,26 +106,7 @@ export function FXRack() {
   const chain = trackDevices[selectedTrackId] ?? [];
   const available = ALL_DEVICES.filter((d) => !chain.includes(d));
 
-  const eqBands: EQBand[] = useMemo(
-    () => [
-      { x: 0.14, g: fxSettings.eqLow / 12 },
-      { x: 0.45, g: fxSettings.eqMid / 12 },
-      { x: 0.72, g: fxSettings.eqHigh / 12 },
-    ],
-    [fxSettings.eqLow, fxSettings.eqMid, fxSettings.eqHigh],
-  );
-
-  const setEQ = useCallback(
-    (bands: EQBand[]) => {
-      if (bands.length < 3) return;
-      setFxSettings({
-        eqLow: Math.max(-12, Math.min(12, bands[0].g * 12)),
-        eqMid: Math.max(-12, Math.min(12, bands[1].g * 12)),
-        eqHigh: Math.max(-12, Math.min(12, bands[2].g * 12)),
-      });
-    },
-    [setFxSettings],
-  );
+  const setEqBand = useSessionStore((s) => s.setEqBand);
 
   const grWidth = fxEnabled && fxSettings.compressorEnabled && fxSettings.compression > 0
     ? Math.min(40, Math.round((fxSettings.compression / 100) * 40))
@@ -237,9 +218,9 @@ export function FXRack() {
       case 'eq':
         return (
           <ParametricEQ
-            bands={eqBands}
+            bands={fxSettings.eqBands}
             enabled={fxEnabled && fxSettings.eqEnabled}
-            onChange={setEQ}
+            onChange={setEqBand}
           />
         );
 

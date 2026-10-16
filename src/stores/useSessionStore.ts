@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ALL_DEVICES, DEVICE_FLAG, type SessionState } from '../types';
+import { ALL_DEVICES, DEFAULT_EQ_BANDS, DEVICE_FLAG, type SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
@@ -46,9 +46,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     compression: 40,
     doubleEnabled: false,
     doubleWidth: 70,
-    eqLow: 0,
-    eqMid: 0,
-    eqHigh: 0,
+    eqBands: DEFAULT_EQ_BANDS,
     delayFeedback: 30,
     delayTime: 0.3,
     reverbWet: 40,
@@ -154,6 +152,13 @@ export const useSessionStore = create<SessionState>((set) => ({
   })),
 
   setSelectedTrackId: (trackId) => set({ selectedTrackId: trackId }),
+
+  setEqBand: (bandId, patch) => set((state) => ({
+    fxSettings: {
+      ...state.fxSettings,
+      eqBands: state.fxSettings.eqBands.map((b) => (b.id === bandId ? { ...b, ...patch } : b)),
+    },
+  })),
 
   addDevice: (trackId, device) => set((state) => {
     const chain = state.trackDevices[trackId] ?? [];
