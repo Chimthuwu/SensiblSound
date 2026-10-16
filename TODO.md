@@ -14,7 +14,7 @@ Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sen
 ## Now
 
 - [ ] Manual test pass: import a backing track, record a take, monitor, playback, mute/solo, volume, Keep as Layer, Record Again, WAV/MP3 export, EQ drag, device add/remove.
-- [ ] Push `6a4ea34` (EQ) and the device-chain commits to `feat/studio-skin`.
+- [x] Push `6a4ea34` (EQ) and the device-chain commits to `feat/studio-skin` (pushed with PR #1).
 - [x] Microphone selector in the Vocal Take header (device list and selection now live in the store).
 - [ ] Per-track effects: route each track through its own device chain. Today the effect graph is global and only affects mic recording.
 - [ ] Clip waveforms in the arrangement (currently empty blocks).
