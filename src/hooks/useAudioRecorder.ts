@@ -4,9 +4,14 @@ import { backupService } from '../services/backupService';
 
 export function useAudioRecorder() {
   const { isRecording, setIsRecording, setActiveTake, setIsPlaying, backingTrack, isMonitoring, fxEnabled, fxSettings } = useSessionStore();
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [isReady, setIsReady] = useState(false);
+  // Device list, selection and readiness live in the store so any component
+  // (e.g. the arrangement's mic picker) can read and change them.
+  const devices = useSessionStore((s) => s.micDevices);
+  const selectedDeviceId = useSessionStore((s) => s.selectedMicId);
+  const setSelectedDeviceId = useSessionStore((s) => s.setSelectedMicId);
+  const setMicDevices = useSessionStore((s) => s.setMicDevices);
+  const setMicReady = useSessionStore((s) => s.setMicReady);
+  const isReady = useSessionStore((s) => s.micReady);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   const mediaRecorder = useRef<MediaRecorder | null>(null);
@@ -30,14 +35,14 @@ export function useAudioRecorder() {
 
         const devs = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devs.filter(d => d.kind === 'audioinput');
-        setDevices(audioInputs);
+        setMicDevices(audioInputs);
         if (audioInputs.length > 0) {
           setSelectedDeviceId(audioInputs[0].deviceId);
         }
-        setIsReady(true);
+        setMicReady(true);
       } catch (err) {
         console.error("Microphone access denied or error:", err);
-        setIsReady(false);
+        setMicReady(false);
       }
     }
     getDevices();

@@ -35,6 +35,12 @@ export function Arrangement() {
   const mutedTracks = useSessionStore((s) => s.mutedTracks);
   const soloedTracks = useSessionStore((s) => s.soloedTracks);
   const trackVolumes = useSessionStore((s) => s.trackVolumes);
+  const micDevices = useSessionStore((s) => s.micDevices);
+  const selectedMicId = useSessionStore((s) => s.selectedMicId);
+  const micReady = useSessionStore((s) => s.micReady);
+  const isRecording = useSessionStore((s) => s.isRecording);
+  const setSelectedMicId = useSessionStore((s) => s.setSelectedMicId);
+  const markLayerDownloaded = useSessionStore((s) => s.markLayerDownloaded);
   const setTrackVolume = useSessionStore((s) => s.setTrackVolume);
 
   const setBackingTrack = useSessionStore((s) => s.setBackingTrack);
@@ -158,6 +164,13 @@ export function Arrangement() {
     } catch (err) {
       console.error('Export failed', err);
     }
+  };
+
+  const downloadLayer = (layerId: string) => {
+    const layer = layers.find((l) => l.id === layerId);
+    if (!layer) return;
+    downloadBlobUrl(layer.url, buildTakeFilename(layer.timestamp, 'vocal-layer', layer.mimeType));
+    markLayerDownloaded(layer.id);
   };
 
   const selectedLane = lanes.find((l) => l.id === selectedTrackId) ?? null;
@@ -321,6 +334,38 @@ export function Arrangement() {
                       title="Hear your mic with the FX applied"
                     >
                       {isMonitoring ? 'Monitoring' : 'Monitor'}
+                    </button>
+                  )}
+                  {lane.id === 'active_take' && (
+                    <select
+                      className="studio-mini-btn"
+                      value={selectedMicId}
+                      disabled={isRecording || !micReady}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setSelectedMicId(e.target.value)}
+                      aria-label="Microphone"
+                      title="Microphone input"
+                      style={{ maxWidth: '100%' }}
+                    >
+                      {!micReady && <option value="">No microphone</option>}
+                      {micDevices.map((d, i) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label || `Microphone ${i + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {lane.id !== 'backing' && lane.id !== 'active_take' && (
+                    <button
+                      className="studio-mini-btn"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadLayer(lane.id);
+                      }}
+                      title="Download this layer as WAV/WebM"
+                    >
+                      Save
                     </button>
                   )}
                   {lane.id !== 'backing' && lane.id !== 'active_take' && (

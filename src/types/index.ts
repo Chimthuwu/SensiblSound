@@ -119,6 +119,13 @@ export interface SessionState {
   // Per-track playback volume, 0..1. Missing keys mean 1 (full volume).
   trackVolumes: Record<string, number>;
   setTrackVolume: (trackId: string, volume: number) => void;
+  // Microphone input. The recorder hook fills these in; the UI reads them.
+  micDevices: MediaDeviceInfo[];
+  selectedMicId: string;
+  micReady: boolean;
+  setMicDevices: (devices: MediaDeviceInfo[]) => void;
+  setSelectedMicId: (deviceId: string) => void;
+  setMicReady: (ready: boolean) => void;
   // The track whose device chain the FX rack is showing.
   selectedTrackId: string;
   setSelectedTrackId: (trackId: string) => void;

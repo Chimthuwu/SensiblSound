@@ -29,6 +29,12 @@ export const useSessionStore = create<SessionState>((set) => ({
   mutedTracks: new Set(),
   soloedTracks: new Set(),
   trackVolumes: {},
+  micDevices: [],
+  selectedMicId: '',
+  micReady: false,
+  setMicDevices: (micDevices) => set({ micDevices }),
+  setSelectedMicId: (selectedMicId) => set({ selectedMicId }),
+  setMicReady: (micReady) => set({ micReady }),
   selectedTrackId: 'active_take',
   trackDevices: { active_take: ALL_DEVICES },
   fxSettings: {

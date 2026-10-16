@@ -205,6 +205,9 @@
 .studio-ghost-btn:disabled, .studio-hero-btn:disabled, .studio-exp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .studio-track-head-controls { flex-wrap: wrap; row-gap: 6px; }
 .studio-track-head-controls input[type=range] { flex-basis: 100%; }
+/* Monitor and the mic picker share one row so the lane header still fits its 96px height. */
+.studio-track-head-controls .studio-mini-btn { flex: none; }
+.studio-track-head-controls select.studio-mini-btn { flex: 1 1 0; min-width: 0; text-overflow: ellipsis; }
 .studio-mini-btn {
   padding: 3px 8px;
   border-radius: 6px;
