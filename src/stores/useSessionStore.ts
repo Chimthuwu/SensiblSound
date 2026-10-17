@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ALL_DEVICES, DEFAULT_EQ_BANDS, DEVICE_FLAG, makeDeviceInstance, type ExtraTrack, type SessionState } from '../types';
+import { DEFAULT_EQ_BANDS, DEVICE_FLAG, makeDeviceInstance, type ExtraTrack, type SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
@@ -36,7 +36,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   setSelectedMicId: (selectedMicId) => set({ selectedMicId }),
   setMicReady: (micReady) => set({ micReady }),
   selectedTrackId: 'active_take',
-  trackDevices: { active_take: ALL_DEVICES.map(makeDeviceInstance) },
+  // Every track starts with an empty device chain.
+  trackDevices: {},
   fxSettings: {
     autotuneEnabled: false,
     compressorEnabled: false,

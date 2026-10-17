@@ -348,7 +348,15 @@ export function FXRack() {
   };
 
   return (
-    <section className="studio-card" aria-label="Devices">
+    <section
+      className="studio-card"
+      aria-label="Devices"
+      onContextMenu={(e) => {
+        // The chain strip has already claimed the event where it is; this covers the rest of the rack.
+        if (e.defaultPrevented) return;
+        openMenu(e, addDeviceItems());
+      }}
+    >
       <div className="studio-card-head">
         <span className="studio-card-head-ic" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
