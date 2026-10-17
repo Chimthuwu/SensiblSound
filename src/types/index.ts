@@ -97,6 +97,16 @@ export type DeviceId ='autotune' | 'doubler' | 'compressor' | 'eq' | 'delay' | '
 
 export const ALL_DEVICES: DeviceId[] = ['autotune', 'doubler', 'compressor', 'eq', 'delay', 'reverb'];
 
+// One device placed on a track's chain. The same type can appear several times, each with its own uid.
+export interface DeviceInstance {
+  uid: string;
+  type: DeviceId;
+}
+
+export function makeDeviceInstance(type: DeviceId): DeviceInstance {
+  return { uid: crypto.randomUUID(), type };
+}
+
 // Which fxSettings flag each device switches on and off.
 export const DEVICE_FLAG: Record<DeviceId, keyof FxSettings> = {
   autotune: 'autotuneEnabled',
@@ -154,9 +164,9 @@ export interface SessionState {
   reorderDevice: (trackId: string, from: number, to: number) => void;
   // Ordered device chain per track. Adding/removing a device also turns its
   // effect on/off in fxSettings.
-  trackDevices: Record<string, DeviceId[]>;
+  trackDevices: Record<string, DeviceInstance[]>;
   addDevice: (trackId: string, device: DeviceId) => void;
-  removeDevice: (trackId: string, device: DeviceId) => void;
+  removeDevice: (trackId: string, uid: string) => void;
 
   // Actions
   setBpm: (bpm: number) => void;

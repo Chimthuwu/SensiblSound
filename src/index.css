@@ -596,7 +596,39 @@
   transition: background 0.15s, border-color 0.15s;
 }
 .studio-drop-zone[data-hover="true"] { border-color: theme("colors.primary"); background: rgba(168, 85, 247, 0.12); color: #fff; }
-.studio-fx-grid[data-disabled="true"] { opacity: 0.32; filter: grayscale(0.75); pointer-events: none; }
+/* Effects switched off dims the devices, not the add slot, so you can still add devices. */
+.studio-fx-grid[data-disabled="true"] .studio-fx-module { opacity: 0.32; filter: grayscale(0.75); pointer-events: none; }
+.studio-fx-add-slot { flex: 0 0 170px; display: flex; align-items: center; justify-content: center; padding: 14px; }
+.studio-fx-add-btn {
+  width: 100%;
+  height: 46px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9c0d8;
+  background: transparent;
+}
+.studio-fx-add-btn:hover, .studio-fx-add-btn[aria-expanded="true"] { border-color: theme("colors.primary"); color: #fff; background: rgba(168, 85, 247, 0.12); }
+.studio-fx-empty-chain { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #8b8299; padding: 14px; }
+/* Device browser: a popout over the rack, opened by the add slot. */
+.studio-device-browser {
+  position: fixed;
+  z-index: 90;
+  width: 290px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 8px;
+  border-radius: 12px;
+  background: #16121d;
+  border: 1px solid #2b2438;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+.studio-device-browser-head { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: #a99bc0; padding: 6px 8px 8px; }
+.studio-device-browser-head span { text-transform: none; letter-spacing: 0; color: #6f6886; margin-left: 6px; }
+.studio-device-item { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #e4e0ee; }
+.studio-device-item:hover { background: rgba(168, 85, 247, 0.16); }
+.studio-device-item span { display: block; font-size: 10.5px; font-weight: 400; color: #8b8299; margin-top: 2px; }
 /* Arrangement takes the free height so the device rack sits just above the transport. */
 .studio > .studio-card:first-child { flex: 1 1 0; min-height: 280px; display: flex; flex-direction: column; }
 .studio > .studio-card:last-child { flex: 0 0 auto; min-height: 250px; }

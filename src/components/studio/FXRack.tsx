@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { ALL_DEVICES, type DeviceId } from '../../types';
 import { Knob } from './Knob';
@@ -86,6 +86,16 @@ function MiniSelect({
   );
 }
 
+// One-line descriptions for the device browser.
+const DEVICE_INFO: Record<DeviceId, string> = {
+  autotune: 'Pitch correction and T-Pain style autotune',
+  doubler: 'A second, offset copy for a wider vocal',
+  compressor: 'Evens out peaks so the vocal sits steady',
+  eq: 'Four-band parametric EQ',
+  delay: 'Echo with feedback',
+  reverb: 'Room tail behind the vocal',
+};
+
 function trackName(trackId: string): string {
   if (trackId === 'backing') return 'Backing Track';
   if (trackId === 'active_take') return 'Vocal Take';
@@ -101,13 +111,34 @@ export function FXRack() {
   const trackDevices = useSessionStore((s) => s.trackDevices);
   const addDevice = useSessionStore((s) => s.addDevice);
   const removeDevice = useSessionStore((s) => s.removeDevice);
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Device browser: opened from the add slot at the end of the chain.
+  const [browserAnchor, setBrowserAnchor] = useState<{ left: number; bottom: number } | null>(null);
+  const addSlotRef = useRef<HTMLButtonElement>(null);
+  const browserRef = useRef<HTMLDivElement>(null);
   const reorderDevice = useSessionStore((s) => s.reorderDevice);
   const stripRef = useRef<HTMLDivElement>(null);
   const [reorder, setReorder] = useState<{ from: number; over: number } | null>(null);
 
+  // Close the device browser on an outside click or Escape.
+  useEffect(() => {
+    if (!browserAnchor) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (browserRef.current?.contains(t) || addSlotRef.current?.contains(t)) return;
+      setBrowserAnchor(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setBrowserAnchor(null);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [browserAnchor]);
+
   const chain = trackDevices[selectedTrackId] ?? [];
-  const available = ALL_DEVICES.filter((d) => !chain.includes(d));
 
   const setEqBand = useSessionStore((s) => s.setEqBand);
 
@@ -325,51 +356,22 @@ export function FXRack() {
         <h2 className="studio-card-head-title">Devices</h2>
         <span className="studio-tag">{trackName(selectedTrackId)}</span>
         <div className="studio-head-spacer" />
-        {available.length > 0 && (
-          <button
-            className="studio-ghost-btn"
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-expanded={menuOpen}
-          >
-            + Add device
-          </button>
-        )}
         <Switch checked={fxEnabled} onChange={setFxEnabled} label="Enable Effects" />
       </div>
 
-      {menuOpen && available.length > 0 && (
-        <div className="studio-device-menu">
-          {available.map((d) => (
-            <button
-              key={d}
-              className="studio-mini-btn"
-              type="button"
-              onClick={() => {
-                addDevice(selectedTrackId, d);
-                setMenuOpen(false);
-              }}
-            >
-              {DEVICE_NAMES[d]}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {chain.length === 0 ? (
-        <div className="studio-fx-empty">
-          No devices on this track. Select a track and use “+ Add device”.
-        </div>
-      ) : (
-        <div ref={stripRef} className="studio-fx-grid" data-disabled={String(!fxEnabled)}>
-          {chain.map((device, index) => {
+      <div ref={stripRef} className="studio-fx-grid" data-disabled={String(!fxEnabled)}>
+          {chain.map((instance, index) => {
+            const device = instance.type;
+            // Numbers copies of the same device: "Delay", "Delay 2", ...
+            const copyNumber = chain.slice(0, index + 1).filter((d) => d.type === device).length;
+            const copyCount = chain.filter((d) => d.type === device).length;
             // Where a dragged device would land, shown as a bar on the module.
             const dropBefore = reorder !== null && reorder.over === index && reorder.from !== index;
             const dropAfter =
               reorder !== null && reorder.over === chain.length && index === chain.length - 1;
             return (
             <div
-              key={device}
+              key={instance.uid}
               className="studio-fx-module"
               data-device-index={index}
               data-off={String(!flagFor[device])}
@@ -408,7 +410,10 @@ export function FXRack() {
                   ⋮⋮
                 </span>
                 <span className="studio-fx-head-dot" />
-                <span className="studio-fx-head-name">{DEVICE_NAMES[device]}</span>
+                <span className="studio-fx-head-name">
+                  {DEVICE_NAMES[device]}
+                  {copyCount > 1 ? ` ${copyNumber}` : ''}
+                </span>
                 <Switch
                   compact
                   checked={flagFor[device]}
@@ -418,7 +423,7 @@ export function FXRack() {
                 <button
                   className="studio-mini-btn"
                   type="button"
-                  onClick={() => removeDevice(selectedTrackId, device)}
+                  onClick={() => removeDevice(selectedTrackId, instance.uid)}
                   aria-label={`Remove ${DEVICE_NAMES[device]}`}
                   title="Remove device"
                 >
@@ -429,6 +434,52 @@ export function FXRack() {
             </div>
             );
           })}
+
+        {chain.length === 0 && (
+          <div className="studio-fx-empty-chain">No devices on this track yet.</div>
+        )}
+        <div className="studio-fx-add-slot">
+          <button
+            ref={addSlotRef}
+            className="studio-fx-add-btn"
+            type="button"
+            aria-expanded={browserAnchor !== null}
+            onClick={() => {
+              if (browserAnchor) {
+                setBrowserAnchor(null);
+                return;
+              }
+              const r = addSlotRef.current?.getBoundingClientRect();
+              if (r) setBrowserAnchor({ left: r.left, bottom: window.innerHeight - r.top + 8 });
+            }}
+          >
+            <span aria-hidden="true">+</span> Add device
+          </button>
+        </div>
+        </div>
+
+      {browserAnchor && (
+        <div
+          ref={browserRef}
+          className="studio-device-browser"
+          role="dialog"
+          aria-label="Device browser"
+          style={{ left: browserAnchor.left, bottom: browserAnchor.bottom }}
+        >
+          <div className="studio-device-browser-head">
+            Device browser <span>click to add, as many as you like</span>
+          </div>
+          {ALL_DEVICES.map((d) => (
+            <button
+              key={d}
+              className="studio-device-item"
+              type="button"
+              onClick={() => addDevice(selectedTrackId, d)}
+            >
+              {DEVICE_NAMES[d]}
+              <span>{DEVICE_INFO[d]}</span>
+            </button>
+          ))}
         </div>
       )}
     </section>

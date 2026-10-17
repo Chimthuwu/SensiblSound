@@ -23,6 +23,8 @@ Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sen
 
 ## Next
 
+- [ ] Per-instance device settings: copies of a device (for example two Delays) currently share one set of settings and one audio node.
+
 - [ ] Add and remove EQ bands (up to 8).
 - [x] Add new tracks: "+ Track" button under TRACKS, and drag & drop audio onto the empty area to create a track.
 - [x] Drag and drop audio onto the arrangement (creates a track or fills an empty one).

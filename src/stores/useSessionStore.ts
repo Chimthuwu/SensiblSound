@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ALL_DEVICES, DEFAULT_EQ_BANDS, DEVICE_FLAG, type ExtraTrack, type SessionState } from '../types';
+import { ALL_DEVICES, DEFAULT_EQ_BANDS, DEVICE_FLAG, makeDeviceInstance, type ExtraTrack, type SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
@@ -36,7 +36,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   setSelectedMicId: (selectedMicId) => set({ selectedMicId }),
   setMicReady: (micReady) => set({ micReady }),
   selectedTrackId: 'active_take',
-  trackDevices: { active_take: ALL_DEVICES },
+  trackDevices: { active_take: ALL_DEVICES.map(makeDeviceInstance) },
   fxSettings: {
     autotuneEnabled: false,
     compressorEnabled: false,
@@ -237,21 +237,29 @@ export const useSessionStore = create<SessionState>((set) => ({
     },
   })),
 
+  // Each call adds a new instance, so the same device can appear more than once.
   addDevice: (trackId, device) => set((state) => {
     const chain = state.trackDevices[trackId] ?? [];
-    if (chain.includes(device)) return {};
     return {
-      trackDevices: { ...state.trackDevices, [trackId]: [...chain, device] },
+      trackDevices: { ...state.trackDevices, [trackId]: [...chain, makeDeviceInstance(device)] },
       fxSettings: { ...state.fxSettings, [DEVICE_FLAG[device]]: true },
     };
   }),
 
-  removeDevice: (trackId, device) => set((state) => {
+  removeDevice: (trackId, uid) => set((state) => {
     const chain = state.trackDevices[trackId] ?? [];
-    if (!chain.includes(device)) return {};
+    const removed = chain.find((d) => d.uid === uid);
+    if (!removed) return {};
+    const nextChain = chain.filter((d) => d.uid !== uid);
+    // The effect stays on while any track still has an instance of it.
+    const stillUsed = Object.entries(state.trackDevices).some(
+      ([id, list]) => (id === trackId ? nextChain : list).some((d) => d.type === removed.type),
+    );
     return {
-      trackDevices: { ...state.trackDevices, [trackId]: chain.filter((d) => d !== device) },
-      fxSettings: { ...state.fxSettings, [DEVICE_FLAG[device]]: false },
+      trackDevices: { ...state.trackDevices, [trackId]: nextChain },
+      fxSettings: stillUsed
+        ? state.fxSettings
+        : { ...state.fxSettings, [DEVICE_FLAG[removed.type]]: false },
     };
   }),
 
