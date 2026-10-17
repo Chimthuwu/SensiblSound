@@ -159,6 +159,24 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   setSelectedTrackId: (trackId) => set({ selectedTrackId: trackId }),
 
+  selectedClip: null,
+  setSelectedClip: (selectedClip) => set({ selectedClip }),
+  replaceClipAudio: (laneId, audio) => set((state) => {
+    if (laneId === 'backing' && state.backingTrack) {
+      return { backingTrack: { ...state.backingTrack, url: audio.url, blob: audio.blob, durationMs: audio.durationMs } };
+    }
+    if (laneId === 'active_take' && state.activeTake) {
+      return { activeTake: { ...state.activeTake, url: audio.url, blob: audio.blob, durationMs: audio.durationMs, downloaded: false } };
+    }
+    if (state.layers.some((l) => l.id === laneId)) {
+      return { layers: state.layers.map((l) => (l.id === laneId ? { ...l, url: audio.url, blob: audio.blob, durationMs: audio.durationMs, downloaded: false } : l)) };
+    }
+    return {
+      extraTracks: state.extraTracks.map((t) =>
+        t.id === laneId && t.clip ? { ...t, clip: { ...t.clip, url: audio.url, blob: audio.blob, durationMs: audio.durationMs } } : t,
+      ),
+    };
+  }),
   armedTrackId: 'active_take',
   setArmedTrackId: (armedTrackId) => set({ armedTrackId }),
   trackPans: {},

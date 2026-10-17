@@ -1314,3 +1314,7 @@
 .studio-arm:hover { border-color: #ef4444; }
 .studio-arm[data-armed="true"] { background: #ef4444; border-color: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.8); }
 .studio-slider-label { flex: none; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #6f6886; }
+
+/* Editable tempo in the transport. */
+.studio-tempo-input { width: 58px; background: transparent; color: inherit; font: inherit; text-align: right; border: 0; border-bottom: 1px dashed #4a4560; padding: 0 2px; }
+.studio-tempo-input:focus { outline: none; border-bottom-color: theme("colors.primary"); }

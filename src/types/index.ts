@@ -143,6 +143,11 @@ export interface SessionState {
   // Per-track playback volume, 0..1. Missing keys mean 1 (full volume).
   trackVolumes: Record<string, number>;
   setTrackVolume: (trackId: string, volume: number) => void;
+  // The clip the keyboard acts on (Delete, Backspace, Ctrl+C/X/V/B).
+  selectedClip: { laneId: string; clipId: string } | null;
+  setSelectedClip: (clip: { laneId: string; clipId: string } | null) => void;
+  // New audio for an existing clip (after reverse or length change). Keeps the clip's place on the timeline.
+  replaceClipAudio: (laneId: string, audio: { url: string; blob: Blob; durationMs: number }) => void;
   // The track the record button writes to: 'backing', 'active_take' or an extra track id.
   armedTrackId: string;
   setArmedTrackId: (trackId: string) => void;

@@ -3,6 +3,7 @@ import { Activity } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 import { SAMPLE_MIME, sampleClip } from '../../utils/samples';
+import { transformClip } from '../../utils/clipTransform';
 import { ClipWaveform } from './ClipWaveform';
 import { useContextMenu, type MenuItem } from './ContextMenu';
 
@@ -57,6 +58,9 @@ export function Arrangement() {
   const setTrackPan = useSessionStore((s) => s.setTrackPan);
   const armedTrackId = useSessionStore((s) => s.armedTrackId);
   const setArmedTrackId = useSessionStore((s) => s.setArmedTrackId);
+  const selectedClip = useSessionStore((s) => s.selectedClip);
+  const setSelectedClip = useSessionStore((s) => s.setSelectedClip);
+  const replaceClipAudio = useSessionStore((s) => s.replaceClipAudio);
   const micDevices = useSessionStore((s) => s.micDevices);
   const selectedMicId = useSessionStore((s) => s.selectedMicId);
   const micReady = useSessionStore((s) => s.micReady);
@@ -327,6 +331,82 @@ export function Arrangement() {
     }
     return items;
   };
+
+  const clipFor = (sel: { laneId: string; clipId: string }) =>
+    laneOf(sel.laneId)?.clips.find((c) => c.id === sel.clipId) ?? null;
+
+  const copyClipObj = (clip: Clip) => {
+    if (!clip.source) return;
+    copyClip({
+      name: clip.name,
+      url: clip.source.url,
+      blob: clip.source.blob,
+      durationMs: clip.lenBars * msPerBar,
+    });
+  };
+
+  /** Deletes the selected clip; an extra track keeps its (now empty) lane. */
+  const deleteSelectedClip = () => {
+    if (!selectedClip) return;
+    if (selectedClip.laneId === 'active_take' && !confirmDeleteTake()) return;
+    clearClip(selectedClip.laneId);
+    setSelectedClip(null);
+  };
+
+  /** Re-renders the selected clip's audio. The new audio replaces the old, keeping its place. */
+  const transformSelected = async (opts: { reverse?: boolean; rate?: number }) => {
+    if (!selectedClip) return;
+    const clip = clipFor(selectedClip);
+    if (!clip?.source) return;
+    const blob = clip.source.blob ?? (await (await fetch(clip.source.url)).blob());
+    const out = await transformClip(blob, opts);
+    replaceClipAudio(selectedClip.laneId, {
+      url: URL.createObjectURL(out.blob),
+      blob: out.blob,
+      durationMs: out.durationMs,
+    });
+  };
+
+  // Keyboard: Delete removes the selected clip, Backspace reverses it, Ctrl+C/X/V copy/cut/paste,
+  // Ctrl+B doubles its length. Typing in a field is left alone.
+  const keyHandler = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyHandler.current = (e: KeyboardEvent) => {
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+    const sel = selectedClip;
+    const clip = sel ? clipFor(sel) : null;
+    if (e.key === 'Delete' && clip) {
+      e.preventDefault();
+      deleteSelectedClip();
+      return;
+    }
+    if (e.key === 'Backspace' && clip) {
+      e.preventDefault();
+      void transformSelected({ reverse: true });
+      return;
+    }
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'c' && clip && sel) {
+      e.preventDefault();
+      copyClipObj(clip);
+    } else if (k === 'x' && clip && sel) {
+      e.preventDefault();
+      copyClipObj(clip);
+      deleteSelectedClip();
+    } else if (k === 'v' && clipboard) {
+      e.preventDefault();
+      pasteAsNewTrack(transportTimeMs);
+    } else if (k === 'b' && clip) {
+      e.preventDefault();
+      void transformSelected({ rate: 0.5 });
+    }
+  };
+  useEffect(() => {
+    const listener = (e: KeyboardEvent) => keyHandler.current(e);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, []);
 
   const selectedLane = lanes.find((l) => l.id === selectedTrackId) ?? null;
 
@@ -661,7 +741,7 @@ export function Arrangement() {
                       <div
                         key={c.id}
                         className="studio-clip"
-                        data-selected={String(selectedTrackId === lane.id)}
+                        data-selected={String(selectedClip?.clipId === c.id)}
                         data-dragging={String(dragging)}
                         style={{
                           left: `${(startBar - 1) * BAR_W}px`,
@@ -672,6 +752,7 @@ export function Arrangement() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedTrackId(lane.id);
+                          setSelectedClip({ laneId: lane.id, clipId: c.id });
                         }}
                         onPointerDown={(e) => {
                           if (e.button !== 0) return;

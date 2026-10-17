@@ -23,6 +23,13 @@ Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sen
 
 ## Next
 
+- [ ] Appearance popover from the gear icon, with the hue slider. Apply the hue to the whole page so context menus follow it.
+- [ ] Transport: set the play start position (click the ruler), and a loop bracket. Ctrl+L sets the loop from a time selection or a selected clip.
+- [ ] Keyboard navigation: arrow keys move through tracks and clips; Shift+arrows extends a clip selection; cut, copy and paste work on the selection.
+- [ ] Warp modes (Repitch, Stretch, Elastique-style via SoundTouch or Rubber Band, Raw). Global button and per-clip choice; clips visibly change length.
+- [x] Clip keyboard: Delete removes, Backspace reverses, Ctrl+C/X/V copy/cut/paste, Ctrl+B doubles the length (pitch drops an octave).
+- [x] Editable tempo in the transport.
+
 - [ ] Expanded EQ view: a button opens a larger editor for detailed band work.
 - [x] Audio input on every track: record arm on each track; the input is still one shared microphone, so per-track input needs per-track recording.
 - [ ] Bulk import of loop packs from archive.org search results (check each item's licence before importing).

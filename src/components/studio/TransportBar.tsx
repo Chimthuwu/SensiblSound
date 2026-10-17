@@ -2,6 +2,7 @@ import { useSessionStore } from '../../stores/useSessionStore';
 
 export function TransportBar() {
   const bpm = useSessionStore((s) => s.bpm);
+  const setBpm = useSessionStore((s) => s.setBpm);
   const isPlaying = useSessionStore((s) => s.isPlaying);
   const isRecording = useSessionStore((s) => s.isRecording);
   const transportTimeMs = useSessionStore((s) => s.transportTimeMs);
@@ -32,7 +33,19 @@ export function TransportBar() {
         <div className="studio-tempo">
           <span className="studio-tp-label">Tempo</span>
           <span className="studio-tempo-value">
-            {bpm}
+            <input
+              type="number"
+              className="studio-tempo-input"
+              min={20}
+              max={300}
+              step={1}
+              value={bpm}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (Number.isFinite(v) && v >= 20 && v <= 300) setBpm(v);
+              }}
+              aria-label="Tempo in BPM"
+            />
             <span>BPM</span>
           </span>
         </div>
