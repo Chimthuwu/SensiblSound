@@ -34,6 +34,8 @@ export interface SampleInfo {
   name: string;
   category: SampleCategory;
   durationMs: number;
+  /** Tempo of the sample, when known. Snapped previews need it. */
+  bpm?: number;
 }
 
 const SR = 44100;

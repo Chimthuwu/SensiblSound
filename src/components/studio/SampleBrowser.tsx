@@ -1,4 +1,5 @@
-import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { ClipWaveform } from './ClipWaveform';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useContextMenu, type MenuItem } from './ContextMenu';
 import {
@@ -14,7 +15,47 @@ import {
   type SampleInfo,
 } from '../../utils/samples';
 
+const BROWSER_COLLAPSED_KEY = 'studio-browser-collapsed';
+const PREVIEW_SNAP_KEY = 'studio-preview-snap';
+
 const CATEGORY_ORDER: SampleCategory[] = ['Drums', 'Bass', 'Synth', 'FX', 'Loops', 'Imported'];
+
+/**
+ * A row's waveform. It loads only once the row scrolls into view, so opening the
+ * browser doesn't fetch every loop up front.
+ */
+function SampleWave({ id }: { id: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setWidth(Math.round(el.clientWidth));
+    const ro = new ResizeObserver(() => setWidth(Math.round(el.clientWidth)));
+    ro.observe(el);
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        io.disconnect();
+        void getSampleUrl(id).then(setUrl).catch(() => setUrl(null));
+      },
+      { rootMargin: '120px' },
+    );
+    io.observe(el);
+    return () => {
+      ro.disconnect();
+      io.disconnect();
+    };
+  }, [id]);
+
+  return (
+    <div ref={ref} className="studio-sample-wave">
+      {url && width > 0 && <ClipWaveform cacheKey={id} source={{ url }} color="#a855f7" width={width} />}
+    </div>
+  );
+}
 
 // One preview at a time, shared by every row.
 let previewAudio: HTMLAudioElement | null = null;
@@ -51,10 +92,49 @@ function audioDurationMs(file: File): Promise<number> {
 export function SampleBrowser() {
   const openMenu = useContextMenu();
   const addTrack = useSessionStore((s) => s.addTrack);
+  const projectBpm = useSessionStore((s) => s.bpm);
+  // Snapped previews play at the project tempo; off plays the sample as recorded.
+  const [snapPreview, setSnapPreview] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(PREVIEW_SNAP_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleSnap = () => {
+    setSnapPreview((on) => {
+      const next = !on;
+      try {
+        localStorage.setItem(PREVIEW_SNAP_KEY, next ? '1' : '0');
+      } catch {
+        // Storage may be blocked; the choice still applies for this visit.
+      }
+      return next;
+    });
+  };
   const [tab, setTab] = useState<'samples' | 'plugins'>('samples');
   const [query, setQuery] = useState('');
   const [imports, setImports] = useState<SampleInfo[]>(() => importedSamples());
   const [previewId, setPreviewId] = useState<string | null>(null);
+  // Collapsed frees the room for the arranger. Remembered per browser.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(BROWSER_COLLAPSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem(BROWSER_COLLAPSED_KEY, next ? '1' : '0');
+      } catch {
+        // Storage may be blocked; the toggle still works for this visit.
+      }
+      return next;
+    });
+  };
   const fileRef = useRef<HTMLInputElement>(null);
 
   const q = query.trim().toLowerCase();
@@ -76,6 +156,9 @@ export function SampleBrowser() {
     stopPreview();
     // Streams from archive.org for loops, so previews start without a full download.
     const audio = new Audio(await getSampleUrl(id));
+    const info = [...SAMPLE_LIBRARY, ...REMOTE_SAMPLES, ...importedSamples()].find((x) => x.id === id);
+    // Snapped: play at project tempo / sample tempo. No known tempo means normal speed.
+    audio.playbackRate = snapPreview && info?.bpm ? projectBpm / info.bpm : 1;
     previewAudio = audio;
     setPreviewId(id);
     audio.onended = () => setPreviewId((current) => (current === id ? null : current));
@@ -108,7 +191,21 @@ export function SampleBrowser() {
   ];
 
   return (
-    <aside className="studio-browser" aria-label="Browser">
+    <aside className="studio-browser" aria-label="Browser" data-collapsed={String(collapsed)}>
+      <button
+        type="button"
+        className="studio-browser-toggle"
+        onClick={toggleCollapsed}
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? 'Show sample browser' : 'Hide sample browser'}
+        title={collapsed ? 'Show browser' : 'Hide browser to make room'}
+      >
+        {collapsed ? '‹' : '›'}
+      </button>
+      {collapsed ? (
+        <span className="studio-browser-vlabel">Browser</span>
+      ) : (
+        <>
       <div className="studio-browser-tabs" role="tablist">
         <button
           type="button"
@@ -141,6 +238,16 @@ export function SampleBrowser() {
               onChange={(e) => setQuery(e.target.value)}
               aria-label="Search samples"
             />
+            <button
+              type="button"
+              className="studio-mini-btn"
+              data-on={String(snapPreview)}
+              aria-pressed={snapPreview}
+              onClick={toggleSnap}
+              title="Play previews at the project tempo (samples without a known tempo play normally)"
+            >
+              Snap
+            </button>
             <button type="button" className="studio-mini-btn" onClick={() => fileRef.current?.click()}>
               Import
             </button>
@@ -183,6 +290,7 @@ export function SampleBrowser() {
                     </button>
                     <span className="studio-sample-name">{s.name}</span>
                     <span className="studio-sample-dur">{formatMs(s.durationMs)}</span>
+                    <SampleWave id={s.id} />
                   </div>
                 ))}
               </div>
@@ -201,6 +309,8 @@ export function SampleBrowser() {
         <div className="studio-browser-empty">
           Plugins are coming. This tab will list instruments and effects you can drop onto tracks.
         </div>
+      )}
+        </>
       )}
     </aside>
   );

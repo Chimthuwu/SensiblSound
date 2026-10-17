@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Activity } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
+import { SAMPLE_MIME, sampleClip } from '../../utils/samples';
 import { ClipWaveform } from './ClipWaveform';
 import { useContextMenu, type MenuItem } from './ContextMenu';
 
@@ -235,6 +236,18 @@ export function Arrangement() {
   const isLayerLane = (laneId: string) => layers.some((l) => l.id === laneId);
   const isEmptyExtraTrack = (laneId: string) => extraTracks.some((t) => t.id === laneId && !t.clip);
   const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
+  const hasSample = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes(SAMPLE_MIME);
+
+  /** A sample dragged from the browser: fills an empty track, or else creates a new one. */
+  const dropSample = async (e: React.DragEvent, trackId: string | null) => {
+    e.preventDefault();
+    setDropHover(false);
+    const id = e.dataTransfer.getData(SAMPLE_MIME);
+    if (!id) return;
+    const clip = await sampleClip(id);
+    if (trackId) setTrackClip(trackId, clip);
+    else addTrack(clip);
+  };
 
   /** Dropped audio fills an empty new track, or else creates a new track. */
   const dropAudio = (e: React.DragEvent, trackId: string | null) => {
@@ -319,6 +332,14 @@ export function Arrangement() {
     <section
       className="studio-card"
       aria-label="Arrangement"
+      onDragOver={(e) => {
+        if (hasSample(e)) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        // Drops already handled by a lane or the drop zone have called preventDefault.
+        if (e.defaultPrevented) return;
+        if (hasSample(e)) void dropSample(e, null);
+      }}
       onContextMenu={(e) => {
         // Track and clip menus have already claimed the event; this is the fallback for the rest of the arranger.
         if (e.defaultPrevented) return;
@@ -597,10 +618,12 @@ export function Arrangement() {
                   data-muted={String(mutedTracks.has(lane.id))}
                   onContextMenu={(e) => openMenu(e, laneMenuItems(lane.id))}
                   onDragOver={(e) => {
-                    if (isEmptyExtraTrack(lane.id) && hasFiles(e)) e.preventDefault();
+                    if (isEmptyExtraTrack(lane.id) && (hasFiles(e) || hasSample(e))) e.preventDefault();
                   }}
                   onDrop={(e) => {
-                    if (isEmptyExtraTrack(lane.id)) dropAudio(e, lane.id);
+                    if (!isEmptyExtraTrack(lane.id)) return;
+                    if (hasSample(e)) void dropSample(e, lane.id);
+                    else dropAudio(e, lane.id);
                   }}
                 >
                   {lane.clips.length === 0 && (
@@ -696,12 +719,12 @@ export function Arrangement() {
         className="studio-drop-zone"
         data-hover={String(dropHover)}
         onDragOver={(e) => {
-          if (!hasFiles(e)) return;
+          if (!hasFiles(e) && !hasSample(e)) return;
           e.preventDefault();
           setDropHover(true);
         }}
         onDragLeave={() => setDropHover(false)}
-        onDrop={(e) => dropAudio(e, null)}
+        onDrop={(e) => (hasSample(e) ? void dropSample(e, null) : dropAudio(e, null))}
         onContextMenu={(e) =>
           openMenu(e, [
             { label: 'Insert Audio Track', onSelect: () => addTrack() },
