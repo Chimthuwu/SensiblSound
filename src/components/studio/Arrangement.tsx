@@ -608,7 +608,7 @@ export function Arrangement() {
                       )}
                     </>
                   )}
-                  {lane.id === 'active_take' && (
+                  {armedTrackId === lane.id && !isLayerLane(lane.id) && (
                     <button
                       className="studio-mini-btn"
                       type="button"
