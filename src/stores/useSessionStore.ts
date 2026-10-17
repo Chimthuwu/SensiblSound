@@ -28,6 +28,15 @@ export const useSessionStore = create<SessionState>((set) => ({
   recordingsHistory: recordingHistoryIndex.list(),
   mutedTracks: new Set(),
   soloedTracks: new Set(),
+  disabledTracks: new Set(),
+  toggleDisabledTrack: (trackId) => set((state) => {
+    const next = new Set(state.disabledTracks);
+    if (next.has(trackId)) next.delete(trackId);
+    else next.add(trackId);
+    return { disabledTracks: next };
+  }),
+  trackOrder: [],
+  setTrackOrder: (trackOrder) => set({ trackOrder }),
   trackVolumes: {},
   micDevices: [],
   selectedMicId: '',

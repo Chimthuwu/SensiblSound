@@ -211,5 +211,11 @@ export interface SessionState {
   markLayerDownloaded: (id: string) => void;
   addRecordingHistoryEntry: (entry: RecordingMeta) => void;
   toggleMuteTrack: (trackId: string) => void;
+  // Disabled tracks are silent and dimmed; they can't be armed.
+  disabledTracks: Set<string>;
+  toggleDisabledTrack: (trackId: string) => void;
+  // Display order of the tracks, top to bottom. Tracks missing from it keep their default place.
+  trackOrder: string[];
+  setTrackOrder: (ids: string[]) => void;
   toggleSoloTrack: (trackId: string) => void;
 }

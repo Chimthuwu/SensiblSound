@@ -1324,3 +1324,9 @@
 
 /* Input picker keeps to its track header; it no longer spills into the track below. */
 .studio-track-head-controls select.studio-mini-btn { height: 22px; max-width: 100%; }
+
+/* Disabled tracks are dimmed; drag a track header to reorder, with a marker where it will land. */
+.studio-track-head[data-disabled="true"], .studio-lane[data-disabled="true"] { opacity: 0.4; }
+.studio-track-head[data-drop="before"] { box-shadow: inset 0 3px 0 theme("colors.primary"); }
+.studio-track-head[data-dragging="true"] { opacity: 0.55; }
+.studio-track-head-name { cursor: grab; touch-action: none; }

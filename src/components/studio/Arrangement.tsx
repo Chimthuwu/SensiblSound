@@ -78,10 +78,16 @@ export function Arrangement() {
   const clipboard = useSessionStore((s) => s.clipboard);
   const copyClip = useSessionStore((s) => s.copyClip);
   const [drag, setDrag] = useState<ClipDrag | null>(null);
-  const setTrackVolume = useSessionStore((s) => s.setTrackVolume);
-
+  const [trackDrag, setTrackDrag] = useState<{ id: string; over: number } | null>(null);
+  const headsRef = useRef<HTMLDivElement>(null);
+  const disabledTracks = useSessionStore((s) => s.disabledTracks);
+  const toggleDisabledTrack = useSessionStore((s) => s.toggleDisabledTrack);
+  const trackOrder = useSessionStore((s) => s.trackOrder);
+  const setTrackOrder = useSessionStore((s) => s.setTrackOrder);
   const setBackingTrack = useSessionStore((s) => s.setBackingTrack);
   const setActiveTake = useSessionStore((s) => s.setActiveTake);
+  const setTrackVolume = useSessionStore((s) => s.setTrackVolume);
+
   const addLayer = useSessionStore((s) => s.addLayer);
   const removeLayer = useSessionStore((s) => s.removeLayer);
   const setIsMonitoring = useSessionStore((s) => s.setIsMonitoring);
@@ -302,6 +308,11 @@ export function Arrangement() {
         onSelect: () => toggleMuteTrack(laneId),
       },
       { label: 'Solo', checked: soloedTracks.has(laneId), onSelect: () => toggleSoloTrack(laneId) },
+      {
+        label: disabledTracks.has(laneId) ? 'Enable track' : 'Disable track',
+        checked: disabledTracks.has(laneId),
+        onSelect: () => toggleDisabledTrack(laneId),
+      },
       { kind: 'separator' },
       { label: 'Copy', disabled: !hasClip, onSelect: () => copyLane(laneId) },
     ];
@@ -327,6 +338,7 @@ export function Arrangement() {
     }
     if (clipboard) {
       items.push({ kind: 'separator' });
+      items.push({ label: 'Paste', onSelect: () => pasteInto(laneId) });
       items.push({ label: 'Paste as new track', onSelect: () => pasteAsNewTrack(transportTimeMs) });
     }
     return items;
@@ -354,17 +366,65 @@ export function Arrangement() {
   };
 
   /** Re-renders the selected clip's audio. The new audio replaces the old, keeping its place. */
-  const transformSelected = async (opts: { reverse?: boolean; rate?: number }) => {
-    if (!selectedClip) return;
-    const clip = clipFor(selectedClip);
+  /** Re-renders a clip's audio. The new audio replaces the old and keeps the clip's place. */
+  const transformClipAt = async (sel: { laneId: string; clipId: string }, opts: { reverse?: boolean; rate?: number }) => {
+    const clip = clipFor(sel);
     if (!clip?.source) return;
     const blob = clip.source.blob ?? (await (await fetch(clip.source.url)).blob());
     const out = await transformClip(blob, opts);
-    replaceClipAudio(selectedClip.laneId, {
+    replaceClipAudio(sel.laneId, {
       url: URL.createObjectURL(out.blob),
       blob: out.blob,
       durationMs: out.durationMs,
     });
+  };
+
+  const transformSelected = (opts: { reverse?: boolean; rate?: number }) =>
+    selectedClip ? transformClipAt(selectedClip, opts) : Promise.resolve();
+
+  /** Deletes one clip; an extra track keeps its (now empty) lane. */
+  const deleteClipAt = (sel: { laneId: string; clipId: string }) => {
+    if (sel.laneId === 'active_take' && !confirmDeleteTake()) return;
+    clearClip(sel.laneId);
+    if (selectedClip?.clipId === sel.clipId) setSelectedClip(null);
+  };
+
+  /** Pastes the copied clip into a track at a time. Replaces that track's clip. */
+  const pasteInto = (laneId: string, atMs: number = transportTimeMs) => {
+    if (!clipboard) return;
+    const { name, url, blob } = clipboard;
+    if (laneId === 'backing') {
+      setBackingTrack({ id: crypto.randomUUID(), name, url, blob, startMs: atMs });
+    } else if (laneId === 'active_take') {
+      setActiveTake({ id: crypto.randomUUID(), url, blob, timestamp: Date.now(), transportStartMs: atMs, mimeType: 'audio/wav' });
+    } else if (isExtraTrack(laneId)) {
+      setTrackClip(laneId, { name, url, blob });
+      setClipStart(laneId, atMs);
+    } else {
+      pasteAsNewTrack(atMs);
+    }
+  };
+
+  const clipMenuItems = (laneId: string, c: Clip): MenuItem[] => {
+    const sel = { laneId, clipId: c.id };
+    return [
+      {
+        label: 'Cut',
+        disabled: !c.source,
+        onSelect: () => {
+          copyClipObj(c);
+          deleteClipAt(sel);
+        },
+      },
+      { label: 'Copy', disabled: !c.source, onSelect: () => copyClipObj(c) },
+      { label: 'Paste', disabled: !clipboard, onSelect: () => pasteInto(laneId) },
+      { kind: 'separator' },
+      { label: 'Reverse', disabled: !c.source, onSelect: () => void transformClipAt(sel, { reverse: true }) },
+      { label: 'Double length', disabled: !c.source, onSelect: () => void transformClipAt(sel, { rate: 0.5 }) },
+      { label: 'Half length', disabled: !c.source, onSelect: () => void transformClipAt(sel, { rate: 2 }) },
+      { kind: 'separator' },
+      { label: 'Delete', danger: true, onSelect: () => deleteClipAt(sel) },
+    ];
   };
 
   // Keyboard: Delete removes the selected clip, Backspace reverses it, Ctrl+C/X/V copy/cut/paste,
@@ -396,7 +456,7 @@ export function Arrangement() {
       deleteSelectedClip();
     } else if (k === 'v' && clipboard) {
       e.preventDefault();
-      pasteAsNewTrack(transportTimeMs);
+      pasteInto(selectedTrackId);
     } else if (k === 'b' && clip) {
       e.preventDefault();
       void transformSelected({ rate: 0.5 });
@@ -407,6 +467,13 @@ export function Arrangement() {
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
   }, []);
+
+  // Lanes in the order the user arranged them. Unplaced tracks keep their default spot.
+  const orderIndex = (id: string) => {
+    const i = trackOrder.indexOf(id);
+    return i === -1 ? 1_000_000 + lanes.findIndex((l) => l.id === id) : i;
+  };
+  const orderedLanes = [...lanes].sort((a, b) => orderIndex(a.id) - orderIndex(b.id));
 
   const selectedLane = lanes.find((l) => l.id === selectedTrackId) ?? null;
 
@@ -494,15 +561,19 @@ export function Arrangement() {
       </div>
 
       <div className="studio-daw">
-        <div className="studio-row-heads">
+        <div className="studio-row-heads" ref={headsRef}>
           <div className="studio-corner">
             <span>Tracks</span>
             <span className="studio-corner-badge">{lanes.length}</span>
           </div>
-          {lanes.map((lane) => (
+          {orderedLanes.map((lane, index) => (
             <div
               key={lane.id}
               className="studio-track-head"
+              data-track-head={lane.id}
+              data-disabled={String(disabledTracks.has(lane.id))}
+              data-dragging={String(trackDrag?.id === lane.id)}
+              data-drop={trackDrag && trackDrag.over === index && trackDrag.id !== lane.id ? 'before' : undefined}
               data-selected={String(lane.id === selectedLane?.id)}
               style={{ '--studio-track-color': lane.color } as React.CSSProperties}
               onClick={() => setSelectedTrackId(lane.id)}
@@ -511,7 +582,38 @@ export function Arrangement() {
               <div className="studio-track-head-body">
                 <div className="studio-track-head-top">
                   <span className="studio-track-head-dot" style={{ background: lane.color }} />
-                  <div className="studio-track-head-name">
+                  <div
+                    className="studio-track-head-name"
+                    title="Drag to reorder"
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      setTrackDrag({ id: lane.id, over: index });
+                    }}
+                    onPointerMove={(e) => {
+                      if (!trackDrag || !headsRef.current) return;
+                      const heads = Array.from(headsRef.current.querySelectorAll<HTMLElement>('[data-track-head]'));
+                      const over = heads.filter((h) => {
+                        const r = h.getBoundingClientRect();
+                        return e.clientY > r.top + r.height / 2;
+                      }).length;
+                      if (over !== trackDrag.over) setTrackDrag({ ...trackDrag, over });
+                    }}
+                    onPointerUp={() => {
+                      if (!trackDrag) return;
+                      const ids = orderedLanes.map((l) => l.id);
+                      const from = ids.indexOf(trackDrag.id);
+                      const to = trackDrag.over > from ? trackDrag.over - 1 : trackDrag.over;
+                      if (from >= 0 && from !== to) {
+                        const next = [...ids];
+                        const [moved] = next.splice(from, 1);
+                        next.splice(to, 0, moved);
+                        setTrackOrder(next);
+                      }
+                      setTrackDrag(null);
+                    }}
+                    onPointerCancel={() => setTrackDrag(null)}
+                  >
                     {lane.name}
                     {lane.sub ? <span className="studio-track-head-sub">{lane.sub}</span> : null}
                   </div>
@@ -707,13 +809,14 @@ export function Arrangement() {
             </div>
 
             <div className="studio-lanes">
-              {lanes.map((lane, i) => (
+              {orderedLanes.map((lane, i) => (
                 <div
                   key={lane.id}
                   className="studio-lane"
                   data-alt={String(i % 2 === 1)}
                   data-track={lane.id}
                   data-muted={String(mutedTracks.has(lane.id))}
+                  data-disabled={String(disabledTracks.has(lane.id))}
                   onContextMenu={(e) => openMenu(e, laneMenuItems(lane.id))}
                   onDragOver={(e) => {
                     if (isEmptyExtraTrack(lane.id) && (hasFiles(e) || hasSample(e))) e.preventDefault();
@@ -783,6 +886,10 @@ export function Arrangement() {
                           setDrag(null);
                         }}
                         onPointerCancel={() => setDrag(null)}
+                        onContextMenu={(e) => {
+                          e.stopPropagation();
+                          openMenu(e, clipMenuItems(lane.id, c));
+                        }}
                       >
                         {c.source && (
                           <ClipWaveform

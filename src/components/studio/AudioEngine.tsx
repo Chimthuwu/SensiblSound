@@ -86,6 +86,7 @@ export function AudioEngine() {
   const mutedTracks = useSessionStore((s) => s.mutedTracks);
   const trackVolumes = useSessionStore((s) => s.trackVolumes);
   const trackPans = useSessionStore((s) => s.trackPans);
+  const disabledTracks = useSessionStore((s) => s.disabledTracks);
   const extraTracks = useSessionStore((s) => s.extraTracks);
   const setExtraTrackDuration = useSessionStore((s) => s.setExtraTrackDuration);
   const soloedTracks = useSessionStore((s) => s.soloedTracks);
@@ -96,7 +97,7 @@ export function AudioEngine() {
   // Mirror the mute/solo logic the arrangement track headers expose.
   const anySoloed = soloedTracks.size > 0;
   const isSilenced = (trackId: string) =>
-    mutedTracks.has(trackId) || (anySoloed && !soloedTracks.has(trackId));
+    disabledTracks.has(trackId) || mutedTracks.has(trackId) || (anySoloed && !soloedTracks.has(trackId));
 
   return (
     <div aria-hidden="true" style={{ position: 'relative', width: 0, height: 0 }}>
