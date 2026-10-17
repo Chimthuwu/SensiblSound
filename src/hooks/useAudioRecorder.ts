@@ -514,7 +514,15 @@ export function useAudioRecorder() {
 
         const url = URL.createObjectURL(finalBlob);
         const id = crypto.randomUUID();
-        setActiveTake({ id, url, blob: finalBlob, timestamp: Date.now(), transportStartMs, mimeType: finalMimeType });
+        // Route the take to whichever track is armed. Tracks 1 and 2 keep their own slots.
+        const { armedTrackId, setBackingTrack, setTrackClip } = useSessionStore.getState();
+        if (armedTrackId === 'backing') {
+          setBackingTrack({ id, name: `Recording ${new Date().toLocaleTimeString()}`, url, blob: finalBlob, startMs: 0 });
+        } else if (armedTrackId === 'active_take' || !armedTrackId) {
+          setActiveTake({ id, url, blob: finalBlob, timestamp: Date.now(), transportStartMs, mimeType: finalMimeType });
+        } else {
+          setTrackClip(armedTrackId, { name: `Recording ${new Date().toLocaleTimeString()}`, url, blob: finalBlob });
+        }
 
         // Trigger Backup Process — local (IndexedDB), cloud (Firebase
         // Storage) and Google Drive are independent, all real, and reported

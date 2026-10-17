@@ -55,6 +55,8 @@ export function Arrangement() {
   const trackVolumes = useSessionStore((s) => s.trackVolumes);
   const trackPans = useSessionStore((s) => s.trackPans);
   const setTrackPan = useSessionStore((s) => s.setTrackPan);
+  const armedTrackId = useSessionStore((s) => s.armedTrackId);
+  const setArmedTrackId = useSessionStore((s) => s.setArmedTrackId);
   const micDevices = useSessionStore((s) => s.micDevices);
   const selectedMicId = useSessionStore((s) => s.selectedMicId);
   const micReady = useSessionStore((s) => s.micReady);
@@ -109,7 +111,7 @@ export function Arrangement() {
     const result: Lane[] = [
       {
         id: 'backing',
-        name: backingTrack?.name ?? 'Backing Track',
+        name: 'Track 1',
         color: '#7c3aed',
         clips: backingTrack
           ? [{
@@ -123,7 +125,7 @@ export function Arrangement() {
       },
       {
         id: 'active_take',
-        name: 'Vocal Take',
+        name: 'Track 2',
         sub: activeTake ? 'Current take' : undefined,
         color: '#a855f7',
         clips: activeTake
@@ -433,6 +435,20 @@ export function Arrangement() {
                     {lane.name}
                     {lane.sub ? <span className="studio-track-head-sub">{lane.sub}</span> : null}
                   </div>
+                  {!isLayerLane(lane.id) && (
+                    <button
+                      className="studio-arm"
+                      type="button"
+                      data-armed={String(armedTrackId === lane.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setArmedTrackId(lane.id);
+                      }}
+                      title={armedTrackId === lane.id ? 'Armed: the record button writes to this track' : 'Arm this track for recording'}
+                      aria-label={`Arm ${lane.name} for recording`}
+                      aria-pressed={armedTrackId === lane.id}
+                    />
+                  )}
                   <div className="studio-msr-group">
                     <button
                       className="studio-msr"
@@ -461,6 +477,7 @@ export function Arrangement() {
                   </div>
                 </div>
                 <div className="studio-track-head-controls">
+                  <span className="studio-slider-label">Vol</span>
                   <input
                     className="studio-vol"
                     type="range"
@@ -472,6 +489,7 @@ export function Arrangement() {
                     aria-label={`${lane.name} volume`}
                     title="Volume"
                   />
+                  <span className="studio-slider-label">Pan</span>
                   <input
                     className="studio-pan"
                     type="range"
@@ -527,7 +545,7 @@ export function Arrangement() {
                       {/* Icon only: the mic picker needs the width. */}
                     </button>
                   )}
-                  {lane.id === 'active_take' && (
+                  {!isLayerLane(lane.id) && (
                     <select
                       className="studio-mini-btn"
                       value={selectedMicId}

@@ -24,7 +24,7 @@ Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sen
 ## Next
 
 - [ ] Expanded EQ view: a button opens a larger editor for detailed band work.
-- [ ] Audio input on every track: record arm and input per track, with the backing track kept empty of FX.
+- [x] Audio input on every track: record arm on each track; the input is still one shared microphone, so per-track input needs per-track recording.
 - [ ] Bulk import of loop packs from archive.org search results (check each item's licence before importing).
 - [ ] Sample browser: Plugins tab (placeholder for now).
 

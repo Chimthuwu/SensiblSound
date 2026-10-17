@@ -88,7 +88,7 @@ export function TopBar() {
             <circle cx="18" cy="6" r="2.4" fill="currentColor" opacity="0.85" />
           </svg>
         </span>
-        <span>For Sensimilliea 💜</span>
+        <span>For SENSIMILLIEA 💜</span>
       </div>
 
       <div className="studio-top-spacer" />

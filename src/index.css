@@ -211,7 +211,7 @@
 /* Volume and pan share a row: volume takes the room, pan is a short slider. */
 .studio-track-head-controls input.studio-vol { flex: 1 1 0; min-width: 0; }
 .studio-track-head-controls input.studio-pan { flex: 0 0 56px; }
-/* Monitor and the mic picker share one row so the lane header still fits its 96px height. */
+/* Monitor and the mic picker share one row so the lane header still fits its height. */
 .studio-track-head-controls .studio-mini-btn { flex: none; }
 .studio-track-head-controls select.studio-mini-btn { flex: 1 1 0; min-width: 0; text-overflow: ellipsis; }
 .studio-mini-btn {
@@ -298,7 +298,7 @@
 }
 
 .studio-track-head {
-  height: 96px;
+  height: 118px;
   border-bottom: 1px solid theme("colors.zinc-600");
   display: flex;
   position: relative;
@@ -477,7 +477,7 @@
 .studio-lanes { position: relative; }
 
 .studio-lane {
-  height: 96px;
+  height: 118px;
   border-bottom: 1px solid theme("colors.zinc-600");
   position: relative;
   background-color: #17141d;
@@ -1308,3 +1308,9 @@
   0%   { opacity: 0; transform: translateY(15px); letter-spacing: 0.6em; filter: blur(5px); }
   100% { opacity: 1; transform: translateY(0); letter-spacing: 0.35em; filter: blur(0); }
 }
+
+/* Track header: record arm, and the Vol / Pan labels beside the sliders. */
+.studio-arm { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #5a3040; background: #1c1726; flex: none; margin-right: 2px; }
+.studio-arm:hover { border-color: #ef4444; }
+.studio-arm[data-armed="true"] { background: #ef4444; border-color: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.8); }
+.studio-slider-label { flex: none; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #6f6886; }

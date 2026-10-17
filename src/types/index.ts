@@ -143,6 +143,9 @@ export interface SessionState {
   // Per-track playback volume, 0..1. Missing keys mean 1 (full volume).
   trackVolumes: Record<string, number>;
   setTrackVolume: (trackId: string, volume: number) => void;
+  // The track the record button writes to: 'backing', 'active_take' or an extra track id.
+  armedTrackId: string;
+  setArmedTrackId: (trackId: string) => void;
   // Per-track stereo pan, -1 (left) to 1 (right). Missing keys mean 0 (centre).
   trackPans: Record<string, number>;
   setTrackPan: (trackId: string, pan: number) => void;

@@ -159,6 +159,8 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   setSelectedTrackId: (trackId) => set({ selectedTrackId: trackId }),
 
+  armedTrackId: 'active_take',
+  setArmedTrackId: (armedTrackId) => set({ armedTrackId }),
   trackPans: {},
   setTrackPan: (trackId, pan) => set((state) => ({
     trackPans: { ...state.trackPans, [trackId]: Math.max(-1, Math.min(1, pan)) },
@@ -223,7 +225,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   addTrack: (clip) => {
     const id = `track-${crypto.randomUUID()}`;
     set((state) => {
-      const name = `Track ${state.extraTracks.length + 1}`;
+      // Tracks 1 and 2 are the built-in lanes, so new tracks start at 3.
+      const name = `Track ${state.extraTracks.length + 3}`;
       const track: ExtraTrack = clip
         ? { id, name, clip: { id: crypto.randomUUID(), ...clip, startMs: 0 } }
         : { id, name };
@@ -235,9 +238,10 @@ export const useSessionStore = create<SessionState>((set) => ({
     return id;
   },
 
+  // Replaces whatever the track holds; a new recording lands here when the track is armed.
   setTrackClip: (trackId, clip) => set((state) => ({
     extraTracks: state.extraTracks.map((t) =>
-      t.id === trackId && !t.clip
+      t.id === trackId
         ? { ...t, clip: { id: crypto.randomUUID(), ...clip, startMs: 0 } }
         : t,
     ),
