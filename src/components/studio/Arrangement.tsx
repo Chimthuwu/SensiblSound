@@ -52,6 +52,8 @@ export function Arrangement() {
   const mutedTracks = useSessionStore((s) => s.mutedTracks);
   const soloedTracks = useSessionStore((s) => s.soloedTracks);
   const trackVolumes = useSessionStore((s) => s.trackVolumes);
+  const trackPans = useSessionStore((s) => s.trackPans);
+  const setTrackPan = useSessionStore((s) => s.setTrackPan);
   const micDevices = useSessionStore((s) => s.micDevices);
   const selectedMicId = useSessionStore((s) => s.selectedMicId);
   const micReady = useSessionStore((s) => s.micReady);
@@ -314,7 +316,20 @@ export function Arrangement() {
   const selectedLane = lanes.find((l) => l.id === selectedTrackId) ?? null;
 
   return (
-    <section className="studio-card" aria-label="Arrangement">
+    <section
+      className="studio-card"
+      aria-label="Arrangement"
+      onContextMenu={(e) => {
+        // Track and clip menus have already claimed the event; this is the fallback for the rest of the arranger.
+        if (e.defaultPrevented) return;
+        openMenu(e, [
+          { label: 'Insert Audio Track', onSelect: () => addTrack() },
+          ...(clipboard
+            ? [{ label: 'Paste as New Track', onSelect: () => pasteAsNewTrack(transportTimeMs) }]
+            : []),
+        ]);
+      }}
+    >
       <div className="studio-card-head">
         <span className="studio-card-head-ic" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -381,14 +396,6 @@ export function Arrangement() {
             <span>Tracks</span>
             <span className="studio-corner-badge">{lanes.length}</span>
           </div>
-          <button
-            className="studio-add-track"
-            type="button"
-            onClick={() => addTrack()}
-            title="Add an empty audio track"
-          >
-            + Track
-          </button>
           {lanes.map((lane) => (
             <div
               key={lane.id}
@@ -434,6 +441,7 @@ export function Arrangement() {
                 </div>
                 <div className="studio-track-head-controls">
                   <input
+                    className="studio-vol"
                     type="range"
                     min={0}
                     max={100}
@@ -442,6 +450,18 @@ export function Arrangement() {
                     onClick={(e) => e.stopPropagation()}
                     aria-label={`${lane.name} volume`}
                     title="Volume"
+                  />
+                  <input
+                    className="studio-pan"
+                    type="range"
+                    min={-100}
+                    max={100}
+                    value={Math.round((trackPans[lane.id] ?? 0) * 100)}
+                    onChange={(e) => setTrackPan(lane.id, Number(e.target.value) / 100)}
+                    onDoubleClick={() => setTrackPan(lane.id, 0)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`${lane.name} pan`}
+                    title={`Pan ${Math.round((trackPans[lane.id] ?? 0) * 100)} (double-click to centre)`}
                   />
                   {lane.id === 'backing' && (
                     <>
@@ -535,6 +555,14 @@ export function Arrangement() {
               </div>
             </div>
           ))}
+          <button
+            className="studio-add-track"
+            type="button"
+            onClick={() => addTrack()}
+            title="Add an empty audio track"
+          >
+            + Track
+          </button>
         </div>
 
         <div className="studio-timeline-col" ref={tColRef}>
@@ -558,8 +586,6 @@ export function Arrangement() {
                 )),
               )}
             </div>
-
-            <div className="studio-add-spacer" aria-hidden="true" />
 
             <div className="studio-lanes">
               {lanes.map((lane, i) => (
@@ -652,6 +678,9 @@ export function Arrangement() {
               ))}
             </div>
 
+            {/* Lines up with the + Track button under the track headers. */}
+            <div className="studio-add-spacer" aria-hidden="true" />
+
             <div
               className="studio-playhead"
               style={{ left: `${progress * totalW}px` }}
@@ -675,7 +704,7 @@ export function Arrangement() {
         onDrop={(e) => dropAudio(e, null)}
         onContextMenu={(e) =>
           openMenu(e, [
-            { label: 'Add track', onSelect: () => addTrack() },
+            { label: 'Insert Audio Track', onSelect: () => addTrack() },
             ...(clipboard
               ? [{ label: 'Paste as new track', onSelect: () => pasteAsNewTrack(transportTimeMs) }]
               : []),

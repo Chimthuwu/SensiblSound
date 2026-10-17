@@ -159,6 +159,11 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   setSelectedTrackId: (trackId) => set({ selectedTrackId: trackId }),
 
+  trackPans: {},
+  setTrackPan: (trackId, pan) => set((state) => ({
+    trackPans: { ...state.trackPans, [trackId]: Math.max(-1, Math.min(1, pan)) },
+  })),
+
   setClipStart: (trackId, startMs) => set((state) => {
     const ms = Math.max(0, Math.round(startMs));
     if (trackId === 'backing') {
