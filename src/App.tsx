@@ -12,6 +12,7 @@ import { AudioEngine } from './components/studio/AudioEngine';
 import { FXRack } from './components/studio/FXRack';
 import { TopBar } from './components/studio/TopBar';
 import { TransportBar } from './components/studio/TransportBar';
+import { SampleBrowser } from './components/studio/SampleBrowser';
 
 function App() {
   const {
@@ -120,10 +121,13 @@ function App() {
           playback for the backing track, active take and layers. */}
       <AudioEngine />
 
+      <div className="studio-shell">
       <main className="studio">
         <Arrangement />
         <FXRack />
       </main>
+      <SampleBrowser />
+      </div>
 
       <TransportBar />
     </div>

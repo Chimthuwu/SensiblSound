@@ -23,6 +23,11 @@ Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sen
 
 ## Next
 
+- [ ] Expanded EQ view: a button opens a larger editor for detailed band work.
+- [ ] Audio input on every track: record arm and input per track, with the backing track kept empty of FX.
+- [ ] Bulk import of loop packs from archive.org search results (check each item's licence before importing).
+- [ ] Sample browser: Plugins tab (placeholder for now).
+
 - [ ] Per-instance device settings: copies of a device (for example two Delays) currently share one set of settings and one audio node.
 
 - [ ] Add and remove EQ bands (up to 8).
