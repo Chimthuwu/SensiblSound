@@ -2,10 +2,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #a855f7; /* neon purple accent */
-  --color-background: #17161d; /* pitch black */
-  --color-surface: #232230; /* slightly lighter dark grey */
-  --color-surface-hover: #2e2c3c;
+  --color-primary: #a64dff; /* neon purple accent */
+  --color-background: #0b0910; /* pitch black */
+  --color-surface: #16121d; /* slightly lighter dark grey */
+  --color-surface-hover: #241e30;
   --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -13,6 +13,9 @@
 @layer base {
   body {
     background-color: var(--color-background);
+    /* Soft violet glow at the top, as in the studio mockup. */
+    background-image: radial-gradient(1200px 600px at 50% -10%, rgba(138, 43, 226, 0.13), transparent 65%);
+    background-attachment: fixed;
     color: #e4e4e7;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
@@ -39,7 +42,7 @@
   align-items: center;
   gap: 10px;
   padding: 0 18px;
-  background: rgba(30, 28, 40, 0.9);
+  background: rgba(11, 9, 16, 0.86);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid theme("colors.zinc-700");
 }
@@ -144,7 +147,7 @@
 }
 
 .studio-card {
-  background: linear-gradient(180deg, theme("colors.surface"), #2b2739);
+  background: linear-gradient(180deg, theme("colors.surface"), #141019);
   border: 1px solid theme("colors.zinc-600");
   border-radius: 14px;
   overflow: hidden;
@@ -259,12 +262,12 @@
 .studio-daw {
   display: grid;
   grid-template-columns: 216px 1fr;
-  background: #24212f;
+  background: #100d16;
 }
 
 .studio-row-heads {
   border-right: 1px solid theme("colors.zinc-600");
-  background: linear-gradient(180deg, #302b3d, #2b2739);
+  background: linear-gradient(180deg, #17131f, #141019);
 }
 
 .studio-corner {
@@ -420,14 +423,14 @@
   position: relative;
   overflow-x: auto;
   overflow-y: hidden;
-  background: #2a2634;
+  background: #151317;
 }
 
 .studio-timeline-inner { position: relative; width: 1280px; }
 
 /* Scrollbar tuning for the timeline column */
 .studio-timeline-col::-webkit-scrollbar { height: 9px; }
-.studio-timeline-col::-webkit-scrollbar-track { background: #24212f; }
+.studio-timeline-col::-webkit-scrollbar-track { background: #100d16; }
 .studio-timeline-col::-webkit-scrollbar-thumb { background: #332c44; border-radius: 5px; }
 .studio-timeline-col::-webkit-scrollbar-thumb:hover { background: #453a5c; }
 
@@ -474,12 +477,12 @@
   height: 96px;
   border-bottom: 1px solid theme("colors.zinc-600");
   position: relative;
-  background-color: #2c2838;
+  background-color: #17141d;
   background-image:
     repeating-linear-gradient(to right, rgba(255, 255, 255, 0.075) 0 1px, transparent 1px 80px),
     repeating-linear-gradient(to right, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 20px);
 }
-.studio-lane[data-alt="true"] { background-color: #2a2636; }
+.studio-lane[data-alt="true"] { background-color: #15121a; }
 .studio-lane:last-child { border-bottom: 0; }
 
 .studio-clip {
@@ -547,12 +550,12 @@
   display: flex;
   align-items: stretch;
   overflow-x: auto;
-  background: #3a3648;
+  background: #2b2438;
   transition: opacity 0.2s, filter 0.2s;
 }
 .studio-fx-grid::-webkit-scrollbar { height: 8px; }
 .studio-fx-grid::-webkit-scrollbar-thumb { background: #4a4560; border-radius: 4px; }
-.studio-fx-grid .studio-fx-module { flex: 0 0 248px; border-right: 2px solid #3a3648; }
+.studio-fx-grid .studio-fx-module { flex: 0 0 248px; border-right: 2px solid #2b2438; }
 .studio-fx-grid .studio-fx-module[data-dragging="true"] { opacity: 0.45; }
 .studio-fx-grid .studio-fx-module[data-drop="before"] { box-shadow: inset 4px 0 0 theme("colors.primary"); }
 .studio-fx-grid .studio-fx-module[data-drop="after"] { box-shadow: inset -4px 0 0 theme("colors.primary"); }
@@ -578,7 +581,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .studio-add-track:hover { color: #fff; background: rgba(168, 85, 247, 0.14); }
-.studio-add-spacer { height: 30px; background: #2a2634; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.studio-add-spacer { height: 30px; background: #151317; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 .studio-drop-zone {
   flex: 1 1 auto;
   min-height: 90px;

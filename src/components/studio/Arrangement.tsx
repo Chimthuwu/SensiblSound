@@ -526,7 +526,7 @@ export function Arrangement() {
                           left: `${(startBar - 1) * BAR_W}px`,
                           width: `${widthPx}px`,
                           borderColor: `color-mix(in srgb, ${lane.color} 58%, transparent)`,
-                          background: `linear-gradient(180deg, color-mix(in srgb, ${lane.color} 26%, #302c3c), color-mix(in srgb, ${lane.color} 12%, #272332))`,
+                          background: `linear-gradient(180deg, color-mix(in srgb, ${lane.color} 26%, #16141d), color-mix(in srgb, ${lane.color} 12%, #131118))`,
                         }}
                         onClick={(e) => {
                           e.stopPropagation();

@@ -154,7 +154,7 @@ export function ParametricEQ({ bands, enabled, onChange }: ParametricEQProps) {
       ctx.arc(cx, cy, b.id === selectedId ? 7 : 5.5, 0, Math.PI * 2);
       ctx.fillStyle = BAND_COLORS[i % BAND_COLORS.length];
       ctx.fill();
-      ctx.strokeStyle = '#1f1b2a';
+      ctx.strokeStyle = '#0e0b15';
       ctx.lineWidth = 2;
       ctx.stroke();
     });
@@ -198,7 +198,7 @@ export function ParametricEQ({ bands, enabled, onChange }: ParametricEQProps) {
     <div ref={wrapRef} style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
       <canvas
         ref={canvasRef}
-        style={{ width: '100%', height: 120, display: 'block', borderRadius: 8, background: '#1f1b2a', cursor: 'crosshair', touchAction: 'none' }}
+        style={{ width: '100%', height: 120, display: 'block', borderRadius: 8, background: '#0e0b15', cursor: 'crosshair', touchAction: 'none' }}
         onPointerDown={(e) => {
           const p = localPos(e);
           const band = bandAt(p.x, p.y, p.w, p.h);
