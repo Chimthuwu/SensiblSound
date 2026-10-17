@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { ALL_DEVICES, type DeviceId } from '../../types';
 import { Knob } from './Knob';
+import { useContextMenu, type MenuItem } from './ContextMenu';
 import { ParametricEQ } from './ParametricEQ';
 
 // All twelve keys — the audio graph maps the note name through a 12-entry
@@ -116,6 +118,9 @@ export function FXRack() {
   const addSlotRef = useRef<HTMLButtonElement>(null);
   const browserRef = useRef<HTMLDivElement>(null);
   const reorderDevice = useSessionStore((s) => s.reorderDevice);
+  const openMenu = useContextMenu();
+  const addDeviceItems = (): MenuItem[] =>
+    ALL_DEVICES.map((d) => ({ label: `Add ${DEVICE_NAMES[d]}`, onSelect: () => addDevice(selectedTrackId, d) }));
   const stripRef = useRef<HTMLDivElement>(null);
   const [reorder, setReorder] = useState<{ from: number; over: number } | null>(null);
 
@@ -359,7 +364,12 @@ export function FXRack() {
         <Switch checked={fxEnabled} onChange={setFxEnabled} label="Enable Effects" />
       </div>
 
-      <div ref={stripRef} className="studio-fx-grid" data-disabled={String(!fxEnabled)}>
+      <div
+        ref={stripRef}
+        className="studio-fx-grid"
+        data-disabled={String(!fxEnabled)}
+        onContextMenu={(e) => openMenu(e, addDeviceItems())}
+      >
           {chain.map((instance, index) => {
             const device = instance.type;
             // Numbers copies of the same device: "Delay", "Delay 2", ...
@@ -375,6 +385,15 @@ export function FXRack() {
               className="studio-fx-module"
               data-device-index={index}
               data-off={String(!flagFor[device])}
+              onContextMenu={(e) => {
+                e.stopPropagation();
+                openMenu(e, [
+                  { label: 'Duplicate', onSelect: () => addDevice(selectedTrackId, device) },
+                  { label: 'Remove', danger: true, onSelect: () => removeDevice(selectedTrackId, instance.uid) },
+                  { kind: 'separator' },
+                  ...addDeviceItems(),
+                ]);
+              }}
               data-dragging={String(reorder?.from === index)}
               data-drop={dropBefore ? 'before' : dropAfter ? 'after' : undefined}
             >
@@ -458,7 +477,7 @@ export function FXRack() {
         </div>
         </div>
 
-      {browserAnchor && (
+      {browserAnchor && createPortal(
         <div
           ref={browserRef}
           className="studio-device-browser"
@@ -480,7 +499,8 @@ export function FXRack() {
               <span>{DEVICE_INFO[d]}</span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   );

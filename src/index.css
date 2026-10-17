@@ -629,6 +629,43 @@
 .studio-device-item { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #e4e0ee; }
 .studio-device-item:hover { background: rgba(168, 85, 247, 0.16); }
 .studio-device-item span { display: block; font-size: 10.5px; font-weight: 400; color: #8b8299; margin-top: 2px; }
+/* Theme hue: the top bar slider sets --hue-shift and the whole app rotates. */
+#root { filter: hue-rotate(var(--hue-shift, 0deg)); }
+.studio-hue { display: flex; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: #8b8299; }
+.studio-hue input[type=range] {
+  width: 110px;
+  background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+  height: 6px;
+}
+.studio-hue input[type=range]::-webkit-slider-thumb { background: #fff; border-color: #0b0910; }
+/* App right-click menu. */
+.studio-context-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 200px;
+  padding: 6px;
+  border-radius: 10px;
+  background: #1b1725;
+  border: 1px solid #3a3148;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  user-select: none;
+}
+.studio-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  text-align: left;
+  color: #e4e0ee;
+}
+.studio-context-item:hover:not(:disabled) { background: rgba(168, 85, 247, 0.18); }
+.studio-context-item:disabled { opacity: 0.35; cursor: default; }
+.studio-context-item[data-danger="true"] { color: #fca5a5; }
+.studio-context-check { width: 12px; color: #c4a2ff; font-size: 11px; }
+.studio-context-sep { height: 1px; margin: 5px 4px; background: #3a3148; }
 /* Arrangement takes the free height so the device rack sits just above the transport. */
 .studio > .studio-card:first-child { flex: 1 1 0; min-height: 280px; display: flex; flex-direction: column; }
 .studio > .studio-card:last-child { flex: 0 0 auto; min-height: 250px; }

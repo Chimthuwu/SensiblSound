@@ -3,6 +3,7 @@ import { Activity } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 import { ClipWaveform } from './ClipWaveform';
+import { useContextMenu, type MenuItem } from './ContextMenu';
 
 const BAR_W = 80;
 const BEAT_W = BAR_W / 4;
@@ -62,6 +63,11 @@ export function Arrangement() {
   const setTrackClip = useSessionStore((s) => s.setTrackClip);
   const [dropHover, setDropHover] = useState(false);
   const setClipStart = useSessionStore((s) => s.setClipStart);
+  const openMenu = useContextMenu();
+  const removeExtraTrack = useSessionStore((s) => s.removeExtraTrack);
+  const clearClip = useSessionStore((s) => s.clearClip);
+  const clipboard = useSessionStore((s) => s.clipboard);
+  const copyClip = useSessionStore((s) => s.copyClip);
   const [drag, setDrag] = useState<ClipDrag | null>(null);
   const setTrackVolume = useSessionStore((s) => s.setTrackVolume);
 
@@ -239,6 +245,72 @@ export function Arrangement() {
     else addTrack(clip);
   };
 
+  const isExtraTrack = (laneId: string) => extraTracks.some((t) => t.id === laneId);
+  const laneOf = (laneId: string) => lanes.find((l) => l.id === laneId) ?? null;
+
+  const confirmDeleteTake = () =>
+    !activeTake || activeTake.downloaded
+      ? true
+      : window.confirm("This take hasn't been downloaded yet. Delete it anyway?");
+
+  const copyLane = (laneId: string) => {
+    const lane = laneOf(laneId);
+    const clip = lane?.clips[0];
+    if (!clip?.source) return;
+    copyClip({
+      name: clip.name,
+      url: clip.source.url,
+      blob: clip.source.blob,
+      durationMs: clip.lenBars * msPerBar,
+    });
+  };
+
+  const pasteAsNewTrack = (atMs: number) => {
+    if (!clipboard) return;
+    const id = addTrack({ name: clipboard.name, url: clipboard.url, blob: clipboard.blob });
+    setClipStart(id, atMs);
+  };
+
+  const laneMenuItems = (laneId: string): MenuItem[] => {
+    const lane = laneOf(laneId);
+    const hasClip = !!lane && lane.clips.length > 0;
+    const items: MenuItem[] = [
+      {
+        label: mutedTracks.has(laneId) ? 'Unmute' : 'Mute',
+        checked: mutedTracks.has(laneId),
+        onSelect: () => toggleMuteTrack(laneId),
+      },
+      { label: 'Solo', checked: soloedTracks.has(laneId), onSelect: () => toggleSoloTrack(laneId) },
+      { kind: 'separator' },
+      { label: 'Copy', disabled: !hasClip, onSelect: () => copyLane(laneId) },
+    ];
+    if (isExtraTrack(laneId)) {
+      items.push({
+        label: 'Delete track',
+        danger: true,
+        onSelect: () => {
+          if (hasClip && !window.confirm(`Delete "${lane?.name}" and its clip?`)) return;
+          removeExtraTrack(laneId);
+        },
+      });
+    } else {
+      items.push({
+        label: 'Delete clip',
+        danger: true,
+        disabled: !hasClip,
+        onSelect: () => {
+          if (laneId === 'active_take' && !confirmDeleteTake()) return;
+          clearClip(laneId);
+        },
+      });
+    }
+    if (clipboard) {
+      items.push({ kind: 'separator' });
+      items.push({ label: 'Paste as new track', onSelect: () => pasteAsNewTrack(transportTimeMs) });
+    }
+    return items;
+  };
+
   const selectedLane = lanes.find((l) => l.id === selectedTrackId) ?? null;
 
   return (
@@ -324,6 +396,7 @@ export function Arrangement() {
               data-selected={String(lane.id === selectedLane?.id)}
               style={{ '--studio-track-color': lane.color } as React.CSSProperties}
               onClick={() => setSelectedTrackId(lane.id)}
+              onContextMenu={(e) => openMenu(e, laneMenuItems(lane.id))}
             >
               <div className="studio-track-head-body">
                 <div className="studio-track-head-top">
@@ -496,6 +569,7 @@ export function Arrangement() {
                   data-alt={String(i % 2 === 1)}
                   data-track={lane.id}
                   data-muted={String(mutedTracks.has(lane.id))}
+                  onContextMenu={(e) => openMenu(e, laneMenuItems(lane.id))}
                   onDragOver={(e) => {
                     if (isEmptyExtraTrack(lane.id) && hasFiles(e)) e.preventDefault();
                   }}
@@ -599,6 +673,14 @@ export function Arrangement() {
         }}
         onDragLeave={() => setDropHover(false)}
         onDrop={(e) => dropAudio(e, null)}
+        onContextMenu={(e) =>
+          openMenu(e, [
+            { label: 'Add track', onSelect: () => addTrack() },
+            ...(clipboard
+              ? [{ label: 'Paste as new track', onSelect: () => pasteAsNewTrack(transportTimeMs) }]
+              : []),
+          ])
+        }
       >
         <span>Drag &amp; drop audio here to create a new track</span>
       </div>

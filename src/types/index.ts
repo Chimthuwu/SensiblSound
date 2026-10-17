@@ -162,6 +162,11 @@ export interface SessionState {
   setTrackClip: (trackId: string, clip: { name: string; url: string; blob?: Blob }) => void;
   setExtraTrackDuration: (trackId: string, durationMs: number) => void;
   reorderDevice: (trackId: string, from: number, to: number) => void;
+  removeExtraTrack: (trackId: string) => void;
+  clearClip: (trackId: string) => void;
+  // Copied clip, pasted as a new track. Plain data: no playback state.
+  clipboard: { name: string; url: string; blob?: Blob; durationMs?: number } | null;
+  copyClip: (clip: { name: string; url: string; blob?: Blob; durationMs?: number } | null) => void;
   // Ordered device chain per track. Adding/removing a device also turns its
   // effect on/off in fxSettings.
   trackDevices: Record<string, DeviceInstance[]>;

@@ -1,6 +1,47 @@
+import { useEffect, useState } from 'react';
 import { HardDrive, Settings, Share2 } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { googleDrive } from '../../lib/googleDrive';
+
+const HUE_KEY = 'studio-hue';
+
+function readHue(): number {
+  try {
+    const v = Number(localStorage.getItem(HUE_KEY));
+    return Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Shifts the whole app's colour hue. Saved per browser. */
+function HueSlider() {
+  const [hue, setHue] = useState(readHue);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--hue-shift', `${hue}deg`);
+    try {
+      localStorage.setItem(HUE_KEY, String(hue));
+    } catch {
+      // Storage can be blocked; the slider still works for this visit.
+    }
+  }, [hue]);
+
+  return (
+    <label className="studio-hue" title="Shift the app's colours">
+      <span>Hue</span>
+      <input
+        type="range"
+        min={0}
+        max={360}
+        step={1}
+        value={hue}
+        onChange={(e) => setHue(Number(e.target.value))}
+        aria-label="Hue"
+      />
+    </label>
+  );
+}
 
 function StatusPill({ state, label }: { state: 'ok' | 'cloud' | 'off'; label: string }) {
   return (
@@ -47,10 +88,11 @@ export function TopBar() {
             <circle cx="18" cy="6" r="2.4" fill="currentColor" opacity="0.85" />
           </svg>
         </span>
-        <span>Sensible Soundlabs</span>
+        <span>For Sensimilliea 💜</span>
       </div>
 
       <div className="studio-top-spacer" />
+      <HueSlider />
 
       <StatusPill state={localPill} label="Saved on This Device" />
       <StatusPill state={cloudPill} label="Backed Up to Cloud" />

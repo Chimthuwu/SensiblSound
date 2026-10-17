@@ -190,6 +190,31 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   extraTracks: [],
 
+  removeExtraTrack: (trackId) => set((state) => {
+    if (!state.extraTracks.some((t) => t.id === trackId)) return {};
+    const { [trackId]: _removed, ...restDevices } = state.trackDevices;
+    return {
+      extraTracks: state.extraTracks.filter((t) => t.id !== trackId),
+      trackDevices: restDevices,
+      selectedTrackId: state.selectedTrackId === trackId ? 'active_take' : state.selectedTrackId,
+    };
+  }),
+
+  // Empties a lane's clip. Backing, take and layer clips go away; an extra track keeps its (now empty) lane.
+  clearClip: (trackId) => set((state) => {
+    if (trackId === 'backing') return { backingTrack: undefined };
+    if (trackId === 'active_take') return { activeTake: undefined };
+    if (state.layers.some((l) => l.id === trackId)) {
+      return { layers: state.layers.filter((l) => l.id !== trackId) };
+    }
+    return {
+      extraTracks: state.extraTracks.map((t) => (t.id === trackId ? { ...t, clip: undefined } : t)),
+    };
+  }),
+
+  clipboard: null,
+  copyClip: (clip) => set({ clipboard: clip }),
+
   addTrack: (clip) => {
     const id = `track-${crypto.randomUUID()}`;
     set((state) => {
