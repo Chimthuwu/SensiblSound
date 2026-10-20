@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSessionStore } from '../../stores/useSessionStore';
-import { ALL_DEVICES, type DeviceId } from '../../types';
+import { ALL_DEVICES, isInstrumentDevice, type DeviceId } from '../../types';
+import { DrumPanel, SynthPanel } from './InstrumentPanels';
 import { Knob } from './Knob';
 import { useContextMenu, type MenuItem } from './ContextMenu';
 import { ParametricEQ } from './ParametricEQ';
@@ -19,6 +20,8 @@ const DEVICE_NAMES: Record<DeviceId, string> = {
   eq: 'Parametric EQ',
   delay: 'Delay',
   reverb: 'Reverb',
+  synth: 'PsydeNote Lite',
+  drums: 'Drum Machine',
 };
 
 // Short label on each device's on/off switch.
@@ -29,6 +32,8 @@ const DEVICE_SWITCH_LABEL: Record<DeviceId, string> = {
   eq: 'EQ',
   delay: 'Delay',
   reverb: 'Verb',
+  synth: 'On',
+  drums: 'On',
 };
 
 function Switch({
@@ -96,12 +101,14 @@ const DEVICE_INFO: Record<DeviceId, string> = {
   eq: 'Four-band parametric EQ',
   delay: 'Echo with feedback',
   reverb: 'Room tail behind the vocal',
+  synth: 'Instrument: a small PsydeNote with FM, two oscillators and a filter. Plays MIDI clips',
+  drums: 'Instrument: eight synthesised drum pads. Plays MIDI clips',
 };
 
-function trackName(trackId: string): string {
+function trackName(trackId: string, extraName?: string): string {
   if (trackId === 'backing') return 'Backing Track';
   if (trackId === 'active_take') return 'Vocal Take';
-  return 'Layer';
+  return extraName ?? 'Layer';
 }
 
 export function FXRack() {
@@ -111,6 +118,7 @@ export function FXRack() {
   const setFxSettings = useSessionStore((s) => s.setFxSettings);
   const selectedTrackId = useSessionStore((s) => s.selectedTrackId);
   const trackDevices = useSessionStore((s) => s.trackDevices);
+  const extraTracks = useSessionStore((s) => s.extraTracks);
   const addDevice = useSessionStore((s) => s.addDevice);
   const removeDevice = useSessionStore((s) => s.removeDevice);
   // Device browser: opened from the add slot at the end of the chain.
@@ -295,6 +303,12 @@ export function FXRack() {
           </div>
         );
 
+      case 'synth':
+        return <SynthPanel laneId={selectedTrackId} />;
+
+      case 'drums':
+        return <DrumPanel laneId={selectedTrackId} />;
+
       case 'reverb':
         return (
           <div className="studio-knob-row">
@@ -334,6 +348,8 @@ export function FXRack() {
     eq: fxSettings.eqEnabled,
     delay: fxSettings.delayEnabled,
     reverb: fxSettings.reverbEnabled,
+    synth: true,
+    drums: true,
   };
   const setFlag = (device: DeviceId, on: boolean) => {
     const key = {
@@ -344,7 +360,8 @@ export function FXRack() {
       delay: 'delayEnabled',
       reverb: 'reverbEnabled',
     } as const;
-    setFxSettings({ [key[device]]: on });
+    if (isInstrumentDevice(device)) return;
+    setFxSettings({ [key[device as keyof typeof key]]: on });
   };
 
   return (
@@ -367,7 +384,7 @@ export function FXRack() {
           </svg>
         </span>
         <h2 className="studio-card-head-title">Devices</h2>
-        <span className="studio-tag">{trackName(selectedTrackId)}</span>
+        <span className="studio-tag">{trackName(selectedTrackId, extraTracks.find((t) => t.id === selectedTrackId)?.name)}</span>
         <div className="studio-head-spacer" />
         <Switch checked={fxEnabled} onChange={setFxEnabled} label="Enable Effects" />
       </div>
@@ -392,7 +409,8 @@ export function FXRack() {
               key={instance.uid}
               className="studio-fx-module"
               data-device-index={index}
-              data-off={String(!flagFor[device])}
+              data-off={String(!isInstrumentDevice(device) && !flagFor[device])}
+              data-instrument={String(isInstrumentDevice(device))}
               onContextMenu={(e) => {
                 e.stopPropagation();
                 openMenu(e, [
@@ -441,12 +459,14 @@ export function FXRack() {
                   {DEVICE_NAMES[device]}
                   {copyCount > 1 ? ` ${copyNumber}` : ''}
                 </span>
-                <Switch
-                  compact
-                  checked={flagFor[device]}
-                  onChange={(v) => setFlag(device, v)}
-                  label={DEVICE_SWITCH_LABEL[device]}
-                />
+                {!isInstrumentDevice(device) && (
+                  <Switch
+                    compact
+                    checked={flagFor[device]}
+                    onChange={(v) => setFlag(device, v)}
+                    label={DEVICE_SWITCH_LABEL[device]}
+                  />
+                )}
                 <button
                   className="studio-mini-btn"
                   type="button"

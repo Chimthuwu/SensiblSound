@@ -13,6 +13,8 @@ import { FXRack } from './components/studio/FXRack';
 import { TopBar } from './components/studio/TopBar';
 import { TransportBar } from './components/studio/TransportBar';
 import { SampleBrowser } from './components/studio/SampleBrowser';
+import { MidiEditor } from './components/studio/MidiEditor';
+import { startMidiEngine } from './midi/midiEngine';
 
 function App() {
   const {
@@ -33,6 +35,9 @@ function App() {
   // Drives transportTimeMs while playing/recording. Without it the playhead,
   // timecode and recording start offsets never move.
   useTimer();
+
+  // MIDI playback scheduler: follows the transport.
+  useEffect(() => startMidiEngine(), []);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -124,6 +129,7 @@ function App() {
       <div className="studio-shell">
       <main className="studio">
         <Arrangement />
+        <MidiEditor />
         <FXRack />
       </main>
       <SampleBrowser />

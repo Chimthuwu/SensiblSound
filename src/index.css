@@ -602,7 +602,7 @@
 }
 .studio-drop-zone[data-hover="true"] { border-color: theme("colors.primary"); background: rgba(168, 85, 247, 0.12); color: #fff; }
 /* Effects switched off dims the devices, not the add slot, so you can still add devices. */
-.studio-fx-grid[data-disabled="true"] .studio-fx-module { opacity: 0.32; filter: grayscale(0.75); pointer-events: none; }
+.studio-fx-grid[data-disabled="true"] .studio-fx-module:not([data-instrument="true"]) { opacity: 0.32; filter: grayscale(0.75); pointer-events: none; }
 .studio-fx-add-slot { flex: 0 0 170px; display: flex; align-items: center; justify-content: center; padding: 14px; }
 .studio-fx-add-btn {
   width: 100%;
@@ -1330,3 +1330,28 @@
 .studio-track-head[data-drop="before"] { box-shadow: inset 0 3px 0 theme("colors.primary"); }
 .studio-track-head[data-dragging="true"] { opacity: 0.55; }
 .studio-track-head-name { cursor: grab; touch-action: none; }
+
+/* MIDI clips and the add-track row */
+.studio-midi-preview { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.studio-add-row { display: flex; gap: 6px; }
+.studio-add-row .studio-add-track { flex: 1; }
+.studio-drum-pads { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 10px 0; }
+
+/* MIDI editor: piano roll and drum steps */
+.studio-midi-editor { margin-top: 10px; }
+.studio-midi-warn { padding: 8px 12px; font-size: 12px; color: #fbbf24; background: rgba(251, 191, 36, 0.08); border-bottom: 1px solid rgba(251, 191, 36, 0.2); }
+.studio-roll-scroll { max-height: 280px; overflow: auto; background: #100e16; }
+.studio-roll { position: relative; }
+.studio-roll-row { display: flex; align-items: stretch; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+.studio-roll-row[data-black="true"] { background: rgba(255, 255, 255, 0.025); }
+.studio-roll-key { flex: 0 0 64px; width: 64px; padding: 0 6px; font-size: 9px; text-align: right; color: #a1a1aa; background: #1b1824; border: 0; border-right: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer; position: sticky; left: 0; z-index: 2; }
+.studio-roll-key[data-black="true"] { background: #131019; }
+.studio-roll-key:hover { color: #fff; }
+.studio-roll-cells { position: relative; display: flex; }
+.studio-roll-cell { flex: 0 0 auto; border-right: 1px solid rgba(255, 255, 255, 0.04); cursor: crosshair; }
+.studio-roll-cell[data-beat="true"] { border-left: 1px solid rgba(255, 255, 255, 0.1); }
+.studio-roll-cell[data-bar="true"] { border-left: 1px solid rgba(255, 255, 255, 0.28); }
+.studio-roll-cell:hover { background: rgba(168, 85, 247, 0.16); }
+.studio-roll-note { position: absolute; top: 1px; bottom: 1px; border-radius: 3px; background: linear-gradient(180deg, #c084fc, #7c3aed); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); cursor: pointer; z-index: 1; }
+.studio-roll-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; background: rgba(255, 255, 255, 0.25); border-radius: 0 3px 3px 0; }
+.studio-roll-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #f43f5e; pointer-events: none; z-index: 3; }

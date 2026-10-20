@@ -93,9 +93,13 @@ export interface ExtraTrack {
   };
 }
 
-export type DeviceId ='autotune' | 'doubler' | 'compressor' | 'eq' | 'delay' | 'reverb';
+// 'synth' and 'drums' are instruments: a MIDI clip only makes sound when its track's rack holds one.
+export type DeviceId = 'autotune' | 'doubler' | 'compressor' | 'eq' | 'delay' | 'reverb' | 'synth' | 'drums';
 
-export const ALL_DEVICES: DeviceId[] = ['autotune', 'doubler', 'compressor', 'eq', 'delay', 'reverb'];
+export const ALL_DEVICES: DeviceId[] = ['autotune', 'doubler', 'compressor', 'eq', 'delay', 'reverb', 'synth', 'drums'];
+
+export const INSTRUMENT_DEVICES: DeviceId[] = ['synth', 'drums'];
+export const isInstrumentDevice = (d: DeviceId) => d === 'synth' || d === 'drums';
 
 // One device placed on a track's chain. The same type can appear several times, each with its own uid.
 export interface DeviceInstance {
@@ -108,7 +112,7 @@ export function makeDeviceInstance(type: DeviceId): DeviceInstance {
 }
 
 // Which fxSettings flag each device switches on and off.
-export const DEVICE_FLAG: Record<DeviceId, keyof FxSettings> = {
+export const DEVICE_FLAG: Partial<Record<DeviceId, keyof FxSettings>> = {
   autotune: 'autotuneEnabled',
   doubler: 'doubleEnabled',
   compressor: 'compressorEnabled',
@@ -218,4 +222,105 @@ export interface SessionState {
   trackOrder: string[];
   setTrackOrder: (ids: string[]) => void;
   toggleSoloTrack: (trackId: string) => void;
+
+  // MIDI: clips can sit on any lane; each lane has one instrument they play through.
+  midiClips: MidiClip[];
+  instruments: Record<string, Instrument>;
+  /** Adds a MIDI clip to a lane. It stays silent until the lane's rack has an instrument. Returns the clip id. */
+  addMidiClip: (laneId: string, opts?: { startMs?: number; bars?: number }) => string;
+  /** New track with an instrument in its rack and an empty MIDI clip. Returns the lane id. */
+  addMidiTrack: (kind: MidiKind, preset?: string) => string;
+  removeMidiClip: (clipId: string) => void;
+  updateMidiClip: (clipId: string, patch: Partial<Omit<MidiClip, 'id' | 'laneId'>>) => void;
+  setMidiNotes: (clipId: string, notes: MidiNote[]) => void;
+  setInstrument: (laneId: string, patch: Partial<Instrument>) => void;
 }
+
+// ---------------------------------------------------------------- MIDI tracks
+export interface MidiNote {
+  id: string;
+  /** MIDI pitch 0..127. Drum tracks use 36..43 for the eight pads. */
+  pitch: number;
+  /** Beats from the start of the clip. */
+  startBeat: number;
+  lenBeats: number;
+  /** 0..1 */
+  vel: number;
+}
+
+export type SynthWave = 'sine' | 'triangle' | 'sawtooth' | 'square';
+
+// A small subtractive + FM synth: two oscillators, optional FM modulator, low-pass filter, amp envelope.
+export interface SynthParams {
+  wave: SynthWave;
+  wave2: SynthWave;
+  /** Oscillator 2 detune in cents. */
+  detune: number;
+  /** Oscillator 2 level 0..1. */
+  mix2: number;
+  /** FM depth 0..1 (0 = off). */
+  fm: number;
+  /** FM modulator frequency as a multiple of the note. */
+  fmRatio: number;
+  cutoff: number; // Hz
+  resonance: number; // Q 0.1..18
+  /** How far the filter envelope opens the cutoff, in octaves. */
+  filterEnv: number;
+  attack: number; // seconds
+  decay: number;
+  sustain: number; // 0..1
+  release: number;
+  volume: number; // 0..1
+}
+
+export interface DrumParams {
+  /** Pitch of the whole kit in semitones, -12..12. */
+  tune: number;
+  /** Decay scale, 0.4..2. */
+  decay: number;
+  volume: number;
+}
+
+export const DRUM_PADS = [
+  { pitch: 36, id: 'kick', name: 'Kick' },
+  { pitch: 37, id: 'snare', name: 'Snare' },
+  { pitch: 38, id: 'clap', name: 'Clap' },
+  { pitch: 39, id: 'hatC', name: 'Hat' },
+  { pitch: 40, id: 'hatO', name: 'Open Hat' },
+  { pitch: 41, id: 'tomL', name: 'Tom Lo' },
+  { pitch: 42, id: 'tomH', name: 'Tom Hi' },
+  { pitch: 43, id: 'crash', name: 'Crash' },
+] as const;
+
+export type MidiKind = 'synth' | 'drums';
+
+// A MIDI clip lives on any lane (audio track or not), so every track is a hybrid: audio clips and MIDI clips side by side.
+export interface MidiClip {
+  id: string;
+  laneId: string;
+  startMs: number;
+  /** Clip length in bars (4/4). */
+  bars: number;
+  notes: MidiNote[];
+}
+
+// Settings for the instrument devices on a lane's rack. Which one plays is decided by the rack ('synth' or 'drums').
+export interface Instrument {
+  synth: SynthParams;
+  drums: DrumParams;
+}
+
+export const DEFAULT_SYNTH: SynthParams = {
+  wave: 'sawtooth', wave2: 'square', detune: 7, mix2: 0.5, fm: 0, fmRatio: 2,
+  cutoff: 2400, resonance: 3, filterEnv: 1.5, attack: 0.01, decay: 0.25, sustain: 0.55, release: 0.25, volume: 0.7,
+};
+
+export const DEFAULT_DRUMS: DrumParams = { tune: 0, decay: 1, volume: 0.9 };
+
+export const SYNTH_PRESETS: Record<string, SynthParams> = {
+  'Psyde Pluck': { ...DEFAULT_SYNTH, wave: 'sawtooth', wave2: 'triangle', fm: 0.25, fmRatio: 3, cutoff: 1800, filterEnv: 2.2, attack: 0.003, decay: 0.18, sustain: 0.15, release: 0.2 },
+  'Warm Pad': { ...DEFAULT_SYNTH, wave: 'sawtooth', wave2: 'sawtooth', detune: 12, mix2: 0.8, cutoff: 1100, filterEnv: 0.6, attack: 0.5, decay: 0.6, sustain: 0.8, release: 1.1 },
+  'Sub Bass': { ...DEFAULT_SYNTH, wave: 'sine', wave2: 'square', detune: 0, mix2: 0.25, cutoff: 700, resonance: 1.2, filterEnv: 1, attack: 0.005, decay: 0.2, sustain: 0.8, release: 0.12 },
+  'Bright Lead': { ...DEFAULT_SYNTH, wave: 'square', wave2: 'sawtooth', detune: 9, mix2: 0.6, cutoff: 3800, resonance: 5, filterEnv: 1.2, attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.25 },
+  'FM Bell': { ...DEFAULT_SYNTH, wave: 'sine', wave2: 'sine', detune: 3, mix2: 0.3, fm: 0.55, fmRatio: 3.5, cutoff: 8000, resonance: 0.7, filterEnv: 0, attack: 0.002, decay: 0.9, sustain: 0.05, release: 1.2 },
+};

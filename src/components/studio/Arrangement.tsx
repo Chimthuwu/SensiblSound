@@ -5,6 +5,8 @@ import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 import { SAMPLE_MIME, sampleClip } from '../../utils/samples';
 import { transformClip } from '../../utils/clipTransform';
 import { ClipWaveform } from './ClipWaveform';
+import { MidiClipPreview } from './MidiClipPreview';
+import type { MidiNote } from '../../types';
 import { useContextMenu, type MenuItem } from './ContextMenu';
 
 const BAR_W = 80;
@@ -21,6 +23,8 @@ interface Clip {
   lenBars: number;
   /** Audio behind the clip, used for its waveform. */
   source?: { url: string; blob?: Blob };
+  /** Present on MIDI clips (they have notes instead of audio). */
+  midi?: { notes: MidiNote[]; bars: number };
 }
 
 interface ClipDrag {
@@ -69,6 +73,13 @@ export function Arrangement() {
   const markLayerDownloaded = useSessionStore((s) => s.markLayerDownloaded);
   const extraTracks = useSessionStore((s) => s.extraTracks);
   const addTrack = useSessionStore((s) => s.addTrack);
+  const midiClips = useSessionStore((s) => s.midiClips);
+  const addMidiClip = useSessionStore((s) => s.addMidiClip);
+  const addMidiTrack = useSessionStore((s) => s.addMidiTrack);
+  const removeMidiClip = useSessionStore((s) => s.removeMidiClip);
+  const updateMidiClip = useSessionStore((s) => s.updateMidiClip);
+  const instruments = useSessionStore((s) => s.instruments);
+  const trackDevices = useSessionStore((s) => s.trackDevices);
   const setTrackClip = useSessionStore((s) => s.setTrackClip);
   const [dropHover, setDropHover] = useState(false);
   const setClipStart = useSessionStore((s) => s.setClipStart);
@@ -170,8 +181,22 @@ export function Arrangement() {
       });
     });
 
+    // Every lane can also hold MIDI clips, next to its audio.
+    for (const lane of result) {
+      for (const mc of midiClips) {
+        if (mc.laneId !== lane.id) continue;
+        lane.clips.push({
+          id: mc.id,
+          name: 'MIDI',
+          startBar: toBars(mc.startMs) + 1,
+          lenBars: mc.bars,
+          midi: { notes: mc.notes, bars: mc.bars },
+        });
+      }
+    }
+
     return result;
-  }, [backingTrack, activeTake, layers, extraTracks, msPerBar]);
+  }, [backingTrack, activeTake, layers, extraTracks, midiClips, msPerBar]);
 
   // The timeline is always long enough to scroll past the content, and grows
   // as the content or the playhead nears its end.
@@ -282,7 +307,7 @@ export function Arrangement() {
 
   const copyLane = (laneId: string) => {
     const lane = laneOf(laneId);
-    const clip = lane?.clips[0];
+    const clip = lane?.clips.find((c) => c.source);
     if (!clip?.source) return;
     copyClip({
       name: clip.name,
@@ -300,7 +325,7 @@ export function Arrangement() {
 
   const laneMenuItems = (laneId: string): MenuItem[] => {
     const lane = laneOf(laneId);
-    const hasClip = !!lane && lane.clips.length > 0;
+    const hasClip = !!lane && lane.clips.some((c) => !c.midi);
     const items: MenuItem[] = [
       {
         label: mutedTracks.has(laneId) ? 'Unmute' : 'Mute',
@@ -314,7 +339,8 @@ export function Arrangement() {
         onSelect: () => toggleDisabledTrack(laneId),
       },
       { kind: 'separator' },
-      { label: 'Copy', disabled: !hasClip, onSelect: () => copyLane(laneId) },
+      { label: 'Add MIDI clip at playhead', onSelect: () => addMidiClip(laneId, { startMs: Math.round(transportTimeMs / (msPerBar / 4)) * (msPerBar / 4) }) },
+      { label: 'Copy', disabled: !lane?.clips.some((c) => c.source), onSelect: () => copyLane(laneId) },
     ];
     if (isExtraTrack(laneId)) {
       items.push({
@@ -360,6 +386,10 @@ export function Arrangement() {
   /** Deletes the selected clip; an extra track keeps its (now empty) lane. */
   const deleteSelectedClip = () => {
     if (!selectedClip) return;
+    if (midiClips.some((m) => m.id === selectedClip.clipId)) {
+      removeMidiClip(selectedClip.clipId);
+      return;
+    }
     if (selectedClip.laneId === 'active_take' && !confirmDeleteTake()) return;
     clearClip(selectedClip.laneId);
     setSelectedClip(null);
@@ -384,6 +414,10 @@ export function Arrangement() {
 
   /** Deletes one clip; an extra track keeps its (now empty) lane. */
   const deleteClipAt = (sel: { laneId: string; clipId: string }) => {
+    if (midiClips.some((m) => m.id === sel.clipId)) {
+      removeMidiClip(sel.clipId);
+      return;
+    }
     if (sel.laneId === 'active_take' && !confirmDeleteTake()) return;
     clearClip(sel.laneId);
     if (selectedClip?.clipId === sel.clipId) setSelectedClip(null);
@@ -405,7 +439,41 @@ export function Arrangement() {
     }
   };
 
-  const clipMenuItems = (laneId: string, c: Clip): MenuItem[] => {
+  const hasInstrument = (laneId: string) => (trackDevices[laneId] ?? []).some((d) => d.type === 'synth' || d.type === 'drums');
+
+  /** Right-click menu for a MIDI clip: its own set of actions, separate from audio clips. */
+  const midiClipMenuItems = (laneId: string, c: Clip): MenuItem[] => {
+    const mc = midiClips.find((m) => m.id === c.id);
+    if (!mc) return [];
+    return [
+      { label: 'Edit notes', onSelect: () => { setSelectedTrackId(laneId); setSelectedClip({ laneId, clipId: c.id }); } },
+      {
+        label: 'Duplicate',
+        onSelect: () => {
+          const id = addMidiClip(laneId, { startMs: mc.startMs + mc.bars * 4 * (60_000 / bpm), bars: mc.bars });
+          useSessionStore.getState().setMidiNotes(id, mc.notes.map((n) => ({ ...n, id: crypto.randomUUID() })));
+        },
+      },
+      { label: 'Clear notes', disabled: mc.notes.length === 0, onSelect: () => useSessionStore.getState().setMidiNotes(mc.id, []) },
+      { kind: 'separator' },
+      { label: 'Length: 1 bar', checked: mc.bars === 1, onSelect: () => updateMidiClip(mc.id, { bars: 1 }) },
+      { label: 'Length: 2 bars', checked: mc.bars === 2, onSelect: () => updateMidiClip(mc.id, { bars: 2 }) },
+      { label: 'Length: 4 bars', checked: mc.bars === 4, onSelect: () => updateMidiClip(mc.id, { bars: 4 }) },
+      { label: 'Length: 8 bars', checked: mc.bars === 8, onSelect: () => updateMidiClip(mc.id, { bars: 8 }) },
+      { kind: 'separator' },
+      ...(hasInstrument(laneId)
+        ? []
+        : [
+            { label: 'Add PsydeNote Lite to the rack', onSelect: () => useSessionStore.getState().addDevice(laneId, 'synth') } as MenuItem,
+            { label: 'Add Drum Machine to the rack', onSelect: () => useSessionStore.getState().addDevice(laneId, 'drums') } as MenuItem,
+            { kind: 'separator' } as MenuItem,
+          ]),
+      { label: 'Delete MIDI clip', danger: true, onSelect: () => removeMidiClip(c.id) },
+    ];
+  };
+
+  /** Right-click menu for an audio clip. */
+  const audioClipMenuItems = (laneId: string, c: Clip): MenuItem[] => {
     const sel = { laneId, clipId: c.id };
     return [
       {
@@ -423,9 +491,15 @@ export function Arrangement() {
       { label: 'Double length', disabled: !c.source, onSelect: () => void transformClipAt(sel, { rate: 0.5 }) },
       { label: 'Half length', disabled: !c.source, onSelect: () => void transformClipAt(sel, { rate: 2 }) },
       { kind: 'separator' },
+      { kind: 'separator' },
+      { label: 'Add MIDI clip on this track', onSelect: () => addMidiClip(laneId, { startMs: c.startBar * msPerBar - msPerBar }) },
+      { kind: 'separator' },
       { label: 'Delete', danger: true, onSelect: () => deleteClipAt(sel) },
     ];
   };
+
+  const clipMenuItems = (laneId: string, c: Clip): MenuItem[] =>
+    c.midi ? midiClipMenuItems(laneId, c) : audioClipMenuItems(laneId, c);
 
   // Keyboard: Delete removes the selected clip, Backspace reverses it, Ctrl+C/X/V copy/cut/paste,
   // Ctrl+B doubles its length. Typing in a field is left alone.
@@ -440,24 +514,31 @@ export function Arrangement() {
       deleteSelectedClip();
       return;
     }
-    if (e.key === 'Backspace' && clip) {
+    if (e.key === 'Backspace' && clip && !clip.midi) {
       e.preventDefault();
       void transformSelected({ reverse: true });
       return;
     }
     if (!(e.ctrlKey || e.metaKey)) return;
     const k = e.key.toLowerCase();
-    if (k === 'c' && clip && sel) {
+    if (k === 'd' && clip?.midi && sel) {
+      e.preventDefault();
+      const mc = midiClips.find((m) => m.id === clip.id);
+      if (mc) {
+        const id = addMidiClip(sel.laneId, { startMs: mc.startMs + mc.bars * 4 * (60_000 / bpm), bars: mc.bars });
+        useSessionStore.getState().setMidiNotes(id, mc.notes.map((n) => ({ ...n, id: crypto.randomUUID() })));
+      }
+    } else if (k === 'c' && clip && sel && !clip.midi) {
       e.preventDefault();
       copyClipObj(clip);
-    } else if (k === 'x' && clip && sel) {
+    } else if (k === 'x' && clip && sel && !clip.midi) {
       e.preventDefault();
       copyClipObj(clip);
       deleteSelectedClip();
     } else if (k === 'v' && clipboard) {
       e.preventDefault();
       pasteInto(selectedTrackId);
-    } else if (k === 'b' && clip) {
+    } else if (k === 'b' && clip && !clip.midi) {
       e.preventDefault();
       void transformSelected({ rate: 0.5 });
     }
@@ -494,6 +575,8 @@ export function Arrangement() {
         if (e.defaultPrevented) return;
         openMenu(e, [
           { label: 'Insert Audio Track', onSelect: () => addTrack() },
+          { label: 'Insert Synth Track', onSelect: () => addMidiTrack('synth') },
+          { label: 'Insert Drum Track', onSelect: () => addMidiTrack('drums') },
           ...(clipboard
             ? [{ label: 'Paste as New Track', onSelect: () => pasteAsNewTrack(transportTimeMs) }]
             : []),
@@ -784,6 +867,14 @@ export function Arrangement() {
           >
             + Track
           </button>
+          <div className="studio-add-row">
+            <button className="studio-add-track" type="button" onClick={() => addMidiTrack('synth')} title="New track with PsydeNote Lite and a MIDI clip">
+              + Synth
+            </button>
+            <button className="studio-add-track" type="button" onClick={() => addMidiTrack('drums')} title="New track with the Drum Machine and a MIDI clip">
+              + Drums
+            </button>
+          </div>
         </div>
 
         <div className="studio-timeline-col" ref={tColRef}>
@@ -881,7 +972,8 @@ export function Arrangement() {
                           e.currentTarget.releasePointerCapture(e.pointerId);
                           if (drag.deltaBars !== 0) {
                             const newStartMs = (drag.origBar - 1 + drag.deltaBars) * msPerBar;
-                            setClipStart(drag.laneId, newStartMs);
+                            if (c.midi) updateMidiClip(c.id, { startMs: Math.max(0, Math.round(newStartMs)) });
+                            else setClipStart(drag.laneId, newStartMs);
                           }
                           setDrag(null);
                         }}
@@ -891,6 +983,7 @@ export function Arrangement() {
                           openMenu(e, clipMenuItems(lane.id, c));
                         }}
                       >
+                        {c.midi && <MidiClipPreview notes={c.midi.notes} bars={c.midi.bars} width={Math.round(widthPx)} color={lane.color} drums={instruments[lane.id] !== undefined && (trackDevices[lane.id] ?? []).some((d) => d.type === 'drums')} />}
                         {c.source && (
                           <ClipWaveform
                             cacheKey={c.id}
@@ -899,7 +992,7 @@ export function Arrangement() {
                             width={Math.round(widthPx)}
                           />
                         )}
-                        <span className="studio-clip-name">{c.name}</span>
+                        <span className="studio-clip-name">{c.midi && !hasInstrument(lane.id) ? 'MIDI (no instrument)' : c.name}</span>
                       </div>
                     );
                   })}
@@ -934,6 +1027,8 @@ export function Arrangement() {
         onContextMenu={(e) =>
           openMenu(e, [
             { label: 'Insert Audio Track', onSelect: () => addTrack() },
+          { label: 'Insert Synth Track', onSelect: () => addMidiTrack('synth') },
+          { label: 'Insert Drum Track', onSelect: () => addMidiTrack('drums') },
             ...(clipboard
               ? [{ label: 'Paste as new track', onSelect: () => pasteAsNewTrack(transportTimeMs) }]
               : []),

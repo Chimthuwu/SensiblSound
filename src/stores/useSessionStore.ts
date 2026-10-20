@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DEFAULT_EQ_BANDS, DEVICE_FLAG, makeDeviceInstance, type ExtraTrack, type SessionState } from '../types';
+import { DEFAULT_DRUMS, DEFAULT_EQ_BANDS, DEFAULT_SYNTH, DEVICE_FLAG, SYNTH_PRESETS, makeDeviceInstance, isInstrumentDevice, type ExtraTrack, type MidiClip, type SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
@@ -225,10 +225,52 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   extraTracks: [],
 
+  midiClips: [],
+  instruments: {},
+  addMidiClip: (laneId, opts = {}) => {
+    const id = crypto.randomUUID();
+    set((state) => {
+      const clip: MidiClip = { id, laneId, startMs: Math.max(0, Math.round(opts.startMs ?? 0)), bars: opts.bars ?? 4, notes: [] };
+      return {
+        midiClips: [...state.midiClips, clip],
+        selectedTrackId: laneId,
+        selectedClip: { laneId, clipId: id },
+      };
+    });
+    return id;
+  },
+  addMidiTrack: (kind, preset) => {
+    const st = useSessionStore.getState();
+    const laneId = st.addTrack();
+    if (preset && SYNTH_PRESETS[preset]) {
+      st.setInstrument(laneId, { synth: { ...SYNTH_PRESETS[preset] } });
+    }
+    st.addDevice(laneId, kind);
+    st.addMidiClip(laneId);
+    return laneId;
+  },
+  removeMidiClip: (clipId) => set((state) => ({
+    midiClips: state.midiClips.filter((c) => c.id !== clipId),
+    selectedClip: state.selectedClip?.clipId === clipId ? null : state.selectedClip,
+  })),
+  updateMidiClip: (clipId, patch) => set((state) => ({
+    midiClips: state.midiClips.map((c) => (c.id === clipId ? { ...c, ...patch } : c)),
+  })),
+  setMidiNotes: (clipId, notes) => set((state) => ({
+    midiClips: state.midiClips.map((c) => (c.id === clipId ? { ...c, notes } : c)),
+  })),
+  setInstrument: (laneId, patch) => set((state) => ({
+    instruments: {
+      ...state.instruments,
+      [laneId]: { ...(state.instruments[laneId] ?? { synth: { ...DEFAULT_SYNTH }, drums: { ...DEFAULT_DRUMS } }), ...patch },
+    },
+  })),
+
   removeExtraTrack: (trackId) => set((state) => {
     if (!state.extraTracks.some((t) => t.id === trackId)) return {};
     const { [trackId]: _removed, ...restDevices } = state.trackDevices;
     return {
+      midiClips: state.midiClips.filter((c) => c.laneId !== trackId),
       extraTracks: state.extraTracks.filter((t) => t.id !== trackId),
       trackDevices: restDevices,
       selectedTrackId: state.selectedTrackId === trackId ? 'active_take' : state.selectedTrackId,
@@ -302,9 +344,10 @@ export const useSessionStore = create<SessionState>((set) => ({
   // Each call adds a new instance, so the same device can appear more than once.
   addDevice: (trackId, device) => set((state) => {
     const chain = state.trackDevices[trackId] ?? [];
+    const flag = DEVICE_FLAG[device];
     return {
       trackDevices: { ...state.trackDevices, [trackId]: [...chain, makeDeviceInstance(device)] },
-      fxSettings: { ...state.fxSettings, [DEVICE_FLAG[device]]: true },
+      fxSettings: flag ? { ...state.fxSettings, [flag]: true } : state.fxSettings,
     };
   }),
 
@@ -317,11 +360,12 @@ export const useSessionStore = create<SessionState>((set) => ({
     const stillUsed = Object.entries(state.trackDevices).some(
       ([id, list]) => (id === trackId ? nextChain : list).some((d) => d.type === removed.type),
     );
+    const removedFlag = DEVICE_FLAG[removed.type];
     return {
       trackDevices: { ...state.trackDevices, [trackId]: nextChain },
-      fxSettings: stillUsed
+      fxSettings: stillUsed || !removedFlag || isInstrumentDevice(removed.type)
         ? state.fxSettings
-        : { ...state.fxSettings, [DEVICE_FLAG[removed.type]]: false },
+        : { ...state.fxSettings, [removedFlag]: false },
     };
   }),
 

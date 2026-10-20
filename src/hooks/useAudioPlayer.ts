@@ -19,7 +19,7 @@ export interface AudioPlayerOptions {
 
 // One AudioContext shared by every player, so pan nodes can live in it.
 let sharedCtx: AudioContext | null = null;
-function playbackContext(): AudioContext {
+export function playbackContext(): AudioContext {
   if (!sharedCtx) sharedCtx = new AudioContext();
   return sharedCtx;
 }
