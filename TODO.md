@@ -48,7 +48,9 @@ Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sen
 
 ## Later (toward a full web DAW)
 
-- [ ] Track types beyond vocals: audio, instrument (MIDI), and sampler.
+- [x] MIDI (2026-10-21, commit ba39e3d, local, not pushed): every track is a hybrid. MIDI clips sit on any lane next to audio clips; a clip only sounds when the track rack holds an instrument (**PsydeNote Lite** synth or **Drum Machine**, both rack devices). Piano roll + 16th-step drum grid editor, QWERTY and Web MIDI live input, separate right-click menus for audio and MIDI clips, + Synth / + Drums buttons. Headless test: notes schedule on play (synth 8 osc for 4 notes, drums fire). Not heard by ear.
+- [ ] MIDI next: record live notes into a clip, velocity editing, note drag/move, multiple clips on one lane overlap rules, MIDI in mixdown export, project save, per-instance instrument settings (same open item as per-instance FX), PsydeNote Lite presets from PsydeNote proper.
+- [ ] Sampler track type.
 - [ ] Device chain engine on AudioWorklet, so effects are real per-track DSP.
 - [ ] Full mixdown export of the arrangement (not just the active take).
 - [ ] Automation lanes for volume, pan and effect parameters.
