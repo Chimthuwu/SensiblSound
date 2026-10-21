@@ -1,5 +1,5 @@
 {
-  "name": "sensible-soundlabs",
+  "name": "psydefx",
   "private": true,
   "version": "0.1.1",
   "type": "module",
@@ -13,8 +13,8 @@
     "electron:build": "npm run build && electron-builder --win"
   },
   "build": {
-    "appId": "com.sensiblsoundlabs.app",
-    "productName": "Sensible Soundlabs",
+    "appId": "com.psydefx.app",
+    "productName": "PsydeFX",
     "directories": {
       "output": "release"
     },

@@ -15,12 +15,12 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 // Drive, which is what makes granting it a low-stakes decision for her.
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
-const FOLDER_NAME = 'Sensible Soundlabs';
+const FOLDER_NAME = 'PsydeFX';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 // Remembers that she has granted consent before, so a later visit can
 // re-acquire a token silently instead of making her click Connect again.
 // Only a boolean — no token is ever persisted to disk.
-const CONSENT_KEY = 'sensibleSoundlabs.driveConnected';
+const CONSENT_KEY = 'psydefx.driveConnected';
 
 export const isDriveConfigured = !!CLIENT_ID;
 
@@ -219,7 +219,7 @@ export const googleDrive = {
   },
 };
 
-// Resolves the "Sensible Soundlabs" folder in her Drive, creating it the
+// Resolves the "PsydeFX" folder in her Drive, creating it the
 // first time. Cached per session so routine uploads cost one request, not
 // three. Under drive.file this search only ever sees our own folder, never
 // an unrelated folder of hers that happens to share the name.

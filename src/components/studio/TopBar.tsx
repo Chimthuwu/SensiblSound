@@ -275,7 +275,7 @@ export function TopBar() {
             <circle cx="18" cy="6" r="2.4" fill="currentColor" opacity="0.85" />
           </svg>
         </span>
-        <span>For SENSIMILLIEA 💜</span>
+        <span title="Making tracks on the side">PsydeFX</span>
       </div>
 
       <div className="studio-top-spacer" />
@@ -297,25 +297,6 @@ export function TopBar() {
               : 'Connect Drive'
         }
       />
-
-      <div className="studio-download-group">
-        <a
-          className="studio-download-btn"
-          href="https://github.com/Chimthuwu/SensiblSound/releases/download/v1.0.0/Sensi.Soundlabs.Setup.0.0.0.exe"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Desktop DL
-        </a>
-        <a
-          className="studio-download-btn"
-          href="https://github.com/Chimthuwu/SensiblSound/releases/download/v1.0.0/SENSI-SOUNDLABS-ANDROID.apk"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Android APK DL
-        </a>
-      </div>
 
       <button
         className="studio-share-btn"

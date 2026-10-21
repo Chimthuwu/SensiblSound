@@ -81,7 +81,7 @@ export function IntroSplash() {
           </div>
         </div>
 
-        <p className="intro-tagline">Made for Sensimilliea</p>
+        <p className="intro-tagline">Making tracks on the side</p>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import type { RecordingMeta } from '../types';
 
-const STORAGE_KEY = 'sensibleSoundlabs.recordingsHistory';
+const STORAGE_KEY = 'psydefx.recordingsHistory';
 // Generous cap so ordinary sessions never hit it; prevents unbounded growth
 // over many sessions in the same browser.
 const MAX_HISTORY = 100;

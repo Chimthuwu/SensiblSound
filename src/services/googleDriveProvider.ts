@@ -1,7 +1,7 @@
 import { googleDrive, ensureBackupFolder, isDriveConfigured } from '../lib/googleDrive';
 import type { BackupProvider } from './backupService';
 
-// Takes land in her own Drive under "Sensible Soundlabs", named by the same
+// Takes land in her own Drive under "PsydeFX", named by the same
 // id the other two backups use so a recording can be found in any of them.
 // The extension is derived from the actual recorded container (webm or ogg,
 // depending on what her browser supports) so the file plays on a double

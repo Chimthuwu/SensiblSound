@@ -9,7 +9,7 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
-    title: 'Sensible Soundlabs',
+    title: 'PsydeFX',
   });
 
   // Remove the default menu for a cleaner DAW look

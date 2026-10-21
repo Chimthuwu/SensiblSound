@@ -11,7 +11,7 @@ export interface BackupProvider {
 export const localBackup = {
   async save(id: string, blob: Blob): Promise<void> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open("SensibleSoundlabsDB", 1);
+      const request = indexedDB.open("PsydeFXDB", 1);
 
       request.onupgradeneeded = () => {
         request.result.createObjectStore("takes");
@@ -39,7 +39,7 @@ export const localBackup = {
 
   async get(id: string): Promise<Blob | null> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open("SensibleSoundlabsDB", 1);
+      const request = indexedDB.open("PsydeFXDB", 1);
 
       request.onupgradeneeded = () => {
         request.result.createObjectStore("takes");
