@@ -208,7 +208,7 @@ function MixerToggle() {
       data-on={String(mode === 'mixer')}
       aria-pressed={mode === 'mixer'}
       onClick={() => setMode(mode === 'mixer' ? 'arrange' : 'mixer')}
-      title={mode === 'mixer' ? 'Back to the arrangement' : 'Show the mixer'}
+      title={mode === 'mixer' ? 'Back to the arrangement (F8 or M)' : 'Show the mixer (F8 or M)'}
     >
       <SlidersVertical size={14} aria-hidden="true" />
       <span>Mixer</span>

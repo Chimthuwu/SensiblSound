@@ -465,7 +465,8 @@ export function useAudioRecorder() {
     if (isRecording) {
       // An armed instrument track records played notes (see midi/midiInput.ts), not the microphone.
       const st = useSessionStore.getState();
-      if ((st.trackDevices[st.armedTrackId] ?? []).some((d) => d.type === 'synth' || d.type === 'drums')) return;
+      const isInstrument = (id: string) => (st.trackDevices[id] ?? []).some((d) => d.type === 'synth' || d.type === 'drums');
+      if (st.armedTrackIds.length > 0 && st.armedTrackIds.every(isInstrument)) return;
       startRecording();
     } else {
       stopRecording();
@@ -518,14 +519,17 @@ export function useAudioRecorder() {
         const url = URL.createObjectURL(finalBlob);
         const id = crypto.randomUUID();
         // Route the take to whichever track is armed. Tracks 1 and 2 keep their own slots.
-        const { armedTrackId, setBackingTrack, setTrackClip } = useSessionStore.getState();
-        if (armedTrackId === 'backing') {
-          setBackingTrack({ id, name: `Recording ${new Date().toLocaleTimeString()}`, url, blob: finalBlob, startMs: 0 });
-        } else if (armedTrackId === 'active_take' || !armedTrackId) {
-          setActiveTake({ id, url, blob: finalBlob, timestamp: Date.now(), transportStartMs, mimeType: finalMimeType });
-        } else {
-          setTrackClip(armedTrackId, { name: `Recording ${new Date().toLocaleTimeString()}`, url, blob: finalBlob });
-        }
+        // With several audio tracks armed, every one gets the take. Instrument tracks record notes instead.
+        const { armedTrackIds, trackDevices, layers, setBackingTrack, setTrackClip } = useSessionStore.getState();
+        const isInstrument = (t: string) => (trackDevices[t] ?? []).some((d) => d.type === 'synth' || d.type === 'drums');
+        const audioTargets = armedTrackIds.filter((t) => !isInstrument(t) && !layers.some((l) => l.id === t));
+        (audioTargets.length ? audioTargets : ['active_take']).forEach((armedTrackId, i) => {
+          const u = i === 0 ? url : URL.createObjectURL(finalBlob);
+          const name = `Recording ${new Date().toLocaleTimeString()}`;
+          if (armedTrackId === 'backing') setBackingTrack({ id: i === 0 ? id : crypto.randomUUID(), name, url: u, blob: finalBlob, startMs: 0 });
+          else if (armedTrackId === 'active_take') setActiveTake({ id: i === 0 ? id : crypto.randomUUID(), url: u, blob: finalBlob, timestamp: Date.now(), transportStartMs, mimeType: finalMimeType });
+          else setTrackClip(armedTrackId, { name, url: u, blob: finalBlob });
+        });
 
         // Trigger Backup Process — local (IndexedDB), cloud (Firebase
         // Storage) and Google Drive are independent, all real, and reported

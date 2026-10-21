@@ -1,6 +1,6 @@
 import { createMeterTap, masterIn, playbackContext } from '../utils/audioBus';
 import { useSessionStore } from '../stores/useSessionStore';
-import { DEFAULT_DRUMS, DEFAULT_SYNTH, isNoteFxDevice, type Instrument, type MidiClip, type MidiKind } from '../types';
+import { DEFAULT_DRUMS, DEFAULT_SYNTH, DEFAULT_TRACK_VOLUME, isNoteFxDevice, type Instrument, type MidiClip, type MidiKind } from '../types';
 import { getEffective, isModulated, modNoteOff, modNoteOn, modNotePulse } from '../mod/modEngine';
 import { DRUM_SPECS, SYNTH_SPECS } from '../mod/params';
 import { audioFxKey, audioFxOf, buildLaneFx } from './laneFx';
@@ -74,7 +74,7 @@ function syncChannels() {
       else ch.fxIn.connect(ch.fxOut);
     }
     const silent = s.disabledTracks.has(id) || s.mutedTracks.has(id) || (anySolo && !s.soloedTracks.has(id));
-    ch.gain.gain.value = silent ? 0 : getEffective(`track:${id}:vol`, s.trackVolumes[id] ?? 1);
+    ch.gain.gain.value = silent ? 0 : getEffective(`track:${id}:vol`, s.trackVolumes[id] ?? DEFAULT_TRACK_VOLUME);
     ch.pan.pan.value = getEffective(`track:${id}:pan`, s.trackPans[id] ?? 0);
   }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
+import { DEFAULT_TRACK_VOLUME } from '../../types';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 
@@ -110,7 +111,7 @@ export function AudioEngine() {
           blob={backingTrack.blob}
           startOffsetMs={backingTrack.startMs ?? 0}
           forceMute={isSilenced('backing')}
-          volume={trackVolumes['backing'] ?? 1}
+          volume={trackVolumes['backing'] ?? DEFAULT_TRACK_VOLUME}
           pan={trackPans['backing'] ?? 0}
           meterId="backing"
           onDuration={setBackingTrackDurationMs}
@@ -123,7 +124,7 @@ export function AudioEngine() {
           blob={activeTake.blob}
           startOffsetMs={activeTake.transportStartMs}
           forceMute={isSilenced('active_take')}
-          volume={trackVolumes['active_take'] ?? 1}
+          volume={trackVolumes['active_take'] ?? DEFAULT_TRACK_VOLUME}
           pan={trackPans['active_take'] ?? 0}
           meterId="active_take"
           onDuration={setActiveTakeDurationMs}
@@ -138,7 +139,7 @@ export function AudioEngine() {
             blob={t.clip.blob}
             startOffsetMs={t.clip.startMs}
             forceMute={isSilenced(t.id)}
-            volume={trackVolumes[t.id] ?? 1}
+            volume={trackVolumes[t.id] ?? DEFAULT_TRACK_VOLUME}
             pan={trackPans[t.id] ?? 0}
             meterId={t.id}
             onDuration={(ms) => setExtraTrackDuration(t.id, ms)}
@@ -153,7 +154,7 @@ export function AudioEngine() {
           blob={layer.blob}
           startOffsetMs={layer.transportStartMs}
           forceMute={isSilenced(layer.id)}
-          volume={trackVolumes[layer.id] ?? 1}
+          volume={trackVolumes[layer.id] ?? DEFAULT_TRACK_VOLUME}
           pan={trackPans[layer.id] ?? 0}
           meterId={layer.id}
           onDuration={(ms) => setLayerDurationMs(layer.id, ms)}

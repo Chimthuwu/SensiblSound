@@ -1544,3 +1544,34 @@ input[data-driven="true"]::-webkit-slider-thumb { outline: 2px solid #fbbf24; ou
 
 /* Volume and pan each get a full-width row of their own (they were sharing one). */
 .studio-track-head-controls input.studio-vol, .studio-track-head-controls input.studio-pan { flex: 1 1 100%; width: 100%; min-width: 0; }
+
+/* Automation lanes under their tracks: they wear the colour of the control they automate */
+.studio-auto-head { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 8px 12px 8px 15px; border-bottom: 1px solid theme("colors.zinc-600"); border-left: 3px solid var(--auto-color, #b06bff); background: #120f18; box-sizing: border-box; overflow: hidden; }
+.studio-auto-head-top, .studio-auto-head-bottom { display: flex; align-items: center; gap: 8px; }
+.studio-auto-tag { flex: none; width: 16px; height: 16px; border-radius: 4px; font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; color: #14101c; background: var(--auto-color, #b06bff); }
+.studio-auto-title { flex: 1; min-width: 0; font-size: 11.5px; font-weight: 600; color: #d4d4d8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio-auto-value { flex: 1; font-size: 11px; color: var(--auto-color, #b06bff); font-variant-numeric: tabular-nums; }
+.studio-auto-lane { background-color: #120f18; overflow: hidden; }
+.studio-auto-lane .auto-svg { position: absolute; inset: 0; display: block; background: transparent; border-radius: 0; cursor: crosshair; }
+.auto-line { stroke: var(--auto-color, #b06bff) !important; stroke-width: 2; }
+.auto-pt { fill: var(--auto-color, #b06bff) !important; }
+.auto-fill { fill: color-mix(in srgb, var(--auto-color, #b06bff) 20%, transparent); stroke: none; pointer-events: none; }
+.auto-zero { stroke: rgba(255, 255, 255, 0.38); stroke-width: 1; stroke-dasharray: 5 4; pointer-events: none; }
+.auto-edge { position: absolute; left: 6px; font-size: 9px; color: #6b6675; pointer-events: none; font-variant-numeric: tabular-nums; }
+.auto-edge[data-pos="top"] { top: 2px; }
+.auto-edge[data-pos="bottom"] { bottom: 2px; }
+.studio-auto-toggle { flex: none; width: 20px; height: 20px; border-radius: 5px; font-size: 10px; font-weight: 800; color: #6b6675; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; }
+.studio-auto-toggle[data-on="true"] { color: #14101c; background: #b06bff; border-color: #b06bff; }
+.mod-title { font-size: 11px; font-weight: 600; letter-spacing: 0.4px; color: #fff; }
+.mod-title span { opacity: 0.6; margin-left: 4px; }
+
+/* A themed dropdown styled as a small button keeps the button look (the generic dropdown rule resets it) */
+.themed-select.studio-mini-btn { padding: 3px 8px; border-radius: 6px; font-size: 10.5px; color: #c9c0d8; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.03); }
+.themed-select.studio-mini-btn:hover { border-color: rgba(168, 85, 247, 0.5); color: #fff; }
+
+/* Top bar: labels never wrap onto two lines; the status pills and download links shrink first */
+.studio-topbar > *, .studio-brand span, .studio-warp-btn span, .studio-theme-btn span { white-space: nowrap; }
+.studio-topbar > * { flex-shrink: 0; }
+.studio-topbar .studio-status { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.studio-topbar .studio-download-group, .studio-topbar .studio-midi-pill { flex: 0 1 auto; min-width: 0; }
+.studio-topbar .studio-top-spacer { flex: 1 1 0; min-width: 0; flex-shrink: 1; }

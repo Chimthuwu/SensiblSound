@@ -38,7 +38,8 @@ export function Select({ value, onChange, children, className, style, disabled, 
   const btnRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState<{ left: number; top: number; width: number; up: boolean } | null>(null);
   const [active, setActive] = useState(0);
-  const current = options.find((o) => o.value === String(value));
+  // Like a native select, a value with no matching option shows the first option.
+  const current = options.find((o) => o.value === String(value)) ?? options[0];
 
   const openList = () => {
     const el = btnRef.current;

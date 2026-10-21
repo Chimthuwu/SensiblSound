@@ -1,6 +1,6 @@
 import { useSessionStore } from '../stores/useSessionStore';
 import { laneInfos } from '../utils/lanes';
-import { DEFAULT_DRUMS, DEFAULT_SYNTH, type DrumParams, type SynthParams } from '../types';
+import { DEFAULT_DRUMS, DEFAULT_SYNTH, DEFAULT_TRACK_VOLUME, type DrumParams, type SynthParams } from '../types';
 import type { ParamRange } from './modCore';
 
 // Every knob or slider that can be modulated or automated has a parameter id:
@@ -52,7 +52,7 @@ export function describeParam(id: string): ParamDesc | null {
     return { id, label: 'Master Volume', min: 0, max: 1, get: () => st().masterVolume, set: (v) => st().setMasterVolume(v) };
   }
   if (kind === 'track' && key === 'vol') {
-    return { id, label: `${laneName(lane)} Volume`, min: 0, max: 1, get: () => st().trackVolumes[lane] ?? 1, set: (v) => st().setTrackVolume(lane, v) };
+    return { id, label: `${laneName(lane)} Volume`, min: 0, max: 1, get: () => st().trackVolumes[lane] ?? DEFAULT_TRACK_VOLUME, set: (v) => st().setTrackVolume(lane, v) };
   }
   if (kind === 'track' && key === 'pan') {
     return { id, label: `${laneName(lane)} Pan`, min: -1, max: 1, get: () => st().trackPans[lane] ?? 0, set: (v) => st().setTrackPan(lane, v) };

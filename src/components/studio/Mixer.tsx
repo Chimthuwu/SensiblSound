@@ -6,7 +6,7 @@ import { panFill } from '../../utils/sliderFill';
 import { buildParamMenu } from '../../mod/paramMenu';
 import { useContextMenu } from './ContextMenu';
 import { useIsDriven } from '../../mod/useModLive';
-import type { DeviceId } from '../../types';
+import { DEFAULT_TRACK_VOLUME, type DeviceId } from '../../types';
 
 const DEVICE_SHORT: Record<DeviceId, string> = {
   autotune: 'Autotune', doubler: 'Doubler', compressor: 'Dynamics', eq: 'EQ', delay: 'Delay', reverb: 'Reverb',
@@ -31,12 +31,12 @@ function Strip({
   id: string; name: string; color: string; kind: 'audio' | 'instrument'; number?: number; master?: boolean;
   meters: React.MutableRefObject<Map<string, MeterRefs>>;
 }) {
-  const volume = useSessionStore((s) => (master ? s.masterVolume : (s.trackVolumes[id] ?? 1)));
+  const volume = useSessionStore((s) => (master ? s.masterVolume : (s.trackVolumes[id] ?? DEFAULT_TRACK_VOLUME)));
   const pan = useSessionStore((s) => s.trackPans[id] ?? 0);
   const muted = useSessionStore((s) => s.mutedTracks.has(id));
   const soloed = useSessionStore((s) => s.soloedTracks.has(id));
   const disabled = useSessionStore((s) => s.disabledTracks.has(id));
-  const armed = useSessionStore((s) => s.armedTrackId === id);
+  const armed = useSessionStore((s) => s.armedTrackIds.includes(id));
   const selected = useSessionStore((s) => s.selectedTrackId === id);
   const devices = useSessionStore((s) => s.trackDevices[id]);
   const isLayer = useSessionStore((s) => s.layers.some((l) => l.id === id));
@@ -46,7 +46,7 @@ function Strip({
   const setPan = useSessionStore((s) => s.setTrackPan);
   const toggleMute = useSessionStore((s) => s.toggleMuteTrack);
   const toggleSolo = useSessionStore((s) => s.toggleSoloTrack);
-  const setArmed = useSessionStore((s) => s.setArmedTrackId);
+  const setArmed = useSessionStore((s) => s.toggleArmedTrack);
   const select = useSessionStore((s) => s.setSelectedTrackId);
 
   const openMenu = useContextMenu();
@@ -109,11 +109,11 @@ function Strip({
         <input
           className="mx-fader" type="range" min={0} max={1000} value={Math.round(toPos(volume) * 1000)}
           onChange={(e) => setVolume(toGain(Number(e.target.value) / 1000))}
-          onDoubleClick={() => setVolume(1)}
+          onDoubleClick={() => setVolume(master ? 1 : DEFAULT_TRACK_VOLUME)}
           onClick={(e) => e.stopPropagation()}
           data-driven={String(volDriven)}
           onContextMenu={(e) => { e.stopPropagation(); openMenu(e, buildParamMenu(volId)); }}
-          aria-label={`${name} volume`} title="Volume (double-click for 0 dB, right-click to automate or modulate)"
+          aria-label={`${name} volume`} title="Volume (double-click to reset, right-click to automate or modulate)"
         />
         <div className="mx-meter" aria-hidden="true">
           {(['l', 'r'] as const).map((ch) => (
@@ -185,7 +185,7 @@ export function Mixer() {
         <h2 className="studio-card-head-title">Mixer</h2>
         <span className="studio-tag">{lanes.length} track{lanes.length === 1 ? '' : 's'}</span>
         <div className="studio-head-spacer" />
-        <span className="studio-tag">Double-click a fader for 0 dB</span>
+        <span className="studio-tag">Double-click a fader to reset it</span>
       </div>
       <div className="mx-board">
         <div className="mx-strips">

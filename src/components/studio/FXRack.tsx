@@ -89,19 +89,12 @@ function StageLabel({ stage }: { stage: DeviceStage }) {
   );
 }
 
-function trackName(trackId: string, extraName?: string): string {
-  if (trackId === 'backing') return 'Backing Track';
-  if (trackId === 'active_take') return 'Vocal Take';
-  return extraName ?? 'Layer';
-}
-
 export function FXRack() {
   const fxEnabled = useSessionStore((s) => s.fxEnabled);
   const fxSettings = useSessionStore((s) => s.fxSettings);
   const setFxSettings = useSessionStore((s) => s.setFxSettings);
   const selectedTrackId = useSessionStore((s) => s.selectedTrackId);
   const trackDevices = useSessionStore((s) => s.trackDevices);
-  const extraTracks = useSessionStore((s) => s.extraTracks);
   const addDevice = useSessionStore((s) => s.addDevice);
   const removeDevice = useSessionStore((s) => s.removeDevice);
   // Device browser: opened from the add slot at the end of the chain.
@@ -377,24 +370,10 @@ export function FXRack() {
         openMenu(e, addDeviceItems());
       }}
     >
-      <div className="studio-card-head">
-        <span className="studio-card-head-ic" aria-hidden="true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M6 3v6M6 15v6M12 3v9M12 18v3M18 3v3M18 12v9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-            <circle cx="6" cy="12" r="2.2" stroke="currentColor" strokeWidth="1.9" />
-            <circle cx="12" cy="15" r="2.2" stroke="currentColor" strokeWidth="1.9" />
-            <circle cx="18" cy="9" r="2.2" stroke="currentColor" strokeWidth="1.9" />
-          </svg>
-        </span>
-        <h2 className="studio-card-head-title">Devices</h2>
-        <span className="studio-tag">{trackName(selectedTrackId, extraTracks.find((t) => t.id === selectedTrackId)?.name)}</span>
-        <div className="studio-head-spacer" />
-        <span className="mod-hint">Click a device to select it · Ctrl+A selects all · a power button switches every selected device</span>
-      </div>
-
       <div
         ref={stripRef}
         className="studio-fx-grid"
+        title="Click a device to select it. Ctrl+A selects all. A power button switches every selected device."
         onContextMenu={(e) => openMenu(e, addDeviceItems())}
       >
           {chain.map((instance, index) => {

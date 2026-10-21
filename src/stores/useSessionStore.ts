@@ -196,8 +196,13 @@ export const useSessionStore = create<SessionState>((set) => ({
       ),
     };
   }),
-  armedTrackId: 'active_take',
-  setArmedTrackId: (armedTrackId) => set({ armedTrackId }),
+  armedTrackId: 'active_take', // the most recently armed track ('' when none): kept for code that wants one
+  setArmedTrackId: (armedTrackId) => set({ armedTrackId, armedTrackIds: armedTrackId ? [armedTrackId] : [] }),
+  armedTrackIds: ['active_take'],
+  toggleArmedTrack: (trackId) => set((state) => {
+    const ids = state.armedTrackIds.includes(trackId) ? state.armedTrackIds.filter((i) => i !== trackId) : [...state.armedTrackIds, trackId];
+    return { armedTrackIds: ids, armedTrackId: ids[ids.length - 1] ?? '' };
+  }),
   trackPans: {},
   setTrackPan: (trackId, pan) => set((state) => ({
     trackPans: { ...state.trackPans, [trackId]: Math.max(-1, Math.min(1, pan)) },
@@ -239,6 +244,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   loop: null,
   setLoop: (loop) => set({ loop }),
   toggleLoop: () => set((state) => (state.loop ? { loop: { ...state.loop, enabled: !state.loop.enabled } } : {})),
+  automationHidden: {},
+  setAutomationHidden: (paramId, hidden) => set((state) => ({ automationHidden: { ...state.automationHidden, [paramId]: hidden } })),
   devicePower: {},
   setDevicePower: (uids, on) => set((state) => {
     const devicePower = { ...state.devicePower };
@@ -299,9 +306,14 @@ export const useSessionStore = create<SessionState>((set) => ({
   setAutomationPoints: (paramId, points) => set((state) => ({
     automation: state.automation.map((a) => (a.paramId === paramId ? { ...a, points: [...points].sort((p, q) => p.beat - q.beat) } : a)),
   })),
-  removeAutomation: (paramId) => set((state) => ({ automation: state.automation.filter((a) => a.paramId !== paramId) })),
+  removeAutomation: (paramId) => set((state) => {
+    const { [paramId]: _gone, ...hidden } = state.automationHidden;
+    return { automation: state.automation.filter((a) => a.paramId !== paramId), automationHidden: hidden };
+  }),
   midiRecordSource: 'played',
   setMidiRecordSource: (midiRecordSource) => set({ midiRecordSource }),
+  browserCollapsed: readFlag('studio-browser-collapsed'),
+  toggleBrowser: () => set((state) => { writeFlag('studio-browser-collapsed', !state.browserCollapsed); return { browserCollapsed: !state.browserCollapsed }; }),
   viewMode: readFlag('sensi-mixer') ? 'mixer' : 'arrange',
   setViewMode: (viewMode) => { writeFlag('sensi-mixer', viewMode === 'mixer'); set({ viewMode }); },
   masterVolume: 1,

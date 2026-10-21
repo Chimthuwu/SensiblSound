@@ -134,6 +134,9 @@ export const DEVICE_FLAG: Partial<Record<DeviceId, keyof FxSettings>> = {
   reverb: 'reverbEnabled',
 };
 
+/** Where a track's volume sits until it is changed: 75%, leaving headroom above it. */
+export const DEFAULT_TRACK_VOLUME = 0.75;
+
 export interface SessionState {
   bpm: number;
   backingTrack?: AudioFile;
@@ -247,9 +250,18 @@ export interface SessionState {
   setLoop: (l: { startMs: number; endMs: number; enabled: boolean } | null) => void;
   toggleLoop: () => void;
 
+  /** Automation lanes the user has hidden (by parameter id). The A button on the track brings them back. */
+  automationHidden: Record<string, boolean>;
+  setAutomationHidden: (paramId: string, hidden: boolean) => void;
+
   /** Power of each device instance (missing = on). Every device in a rack has its own power button. */
   devicePower: Record<string, boolean>;
   setDevicePower: (uids: string[], on: boolean) => void;
+
+  /** Every track armed for recording. Several can be armed at once: they all record together. */
+  armedTrackIds: string[];
+  /** Arms the track if it is not armed, disarms it if it is. */
+  toggleArmedTrack: (trackId: string) => void;
 
   /** Recording is armed: the next Play also records. R toggles it; it never starts the transport by itself. */
   recordArmed: boolean;
@@ -278,6 +290,10 @@ export interface SessionState {
   /** What MIDI recording stores: the notes as played, or what comes out of the track's MIDI FX (the instrument's input). */
   midiRecordSource: 'played' | 'output';
   setMidiRecordSource: (s: 'played' | 'output') => void;
+
+  /** The sample browser on the right is folded away. F5 or B toggles it. */
+  browserCollapsed: boolean;
+  toggleBrowser: () => void;
 
   // Centre panel: the arrangement or the mixer.
   viewMode: 'arrange' | 'mixer';

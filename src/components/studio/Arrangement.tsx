@@ -1,5 +1,7 @@
 import { Select } from './Select';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { DEFAULT_TRACK_VOLUME } from '../../types';
+import { AutomationHead, AutomationLane, automationLaneOf } from './AutomationLane';
+import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Activity } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
@@ -66,8 +68,8 @@ export function Arrangement() {
   const trackVolumes = useSessionStore((s) => s.trackVolumes);
   const trackPans = useSessionStore((s) => s.trackPans);
   const setTrackPan = useSessionStore((s) => s.setTrackPan);
-  const armedTrackId = useSessionStore((s) => s.armedTrackId);
-  const setArmedTrackId = useSessionStore((s) => s.setArmedTrackId);
+  const armedTrackIds = useSessionStore((s) => s.armedTrackIds);
+  const toggleArmedTrack = useSessionStore((s) => s.toggleArmedTrack);
   const selectedClip = useSessionStore((s) => s.selectedClip);
   const setSelectedClip = useSessionStore((s) => s.setSelectedClip);
   const replaceClipAudio = useSessionStore((s) => s.replaceClipAudio);
@@ -656,6 +658,15 @@ export function Arrangement() {
 
   const selectedLane = lanes.find((l) => l.id === selectedTrackId) ?? null;
 
+  // Automation lanes sit directly under the track they belong to (the master's go at the bottom) and can be hidden.
+  const automationHidden = useSessionStore((s) => s.automationHidden);
+  const setAutomationHidden = useSessionStore((s) => s.setAutomationHidden);
+  const AUTO_H = 88;
+  const autosOf = (laneId: string) => automation.filter((a) => automationLaneOf(a.paramId) === laneId);
+  const shownAutos = (laneId: string) => autosOf(laneId).filter((a) => !automationHidden[a.paramId]);
+  const autoHeads = (laneId: string) => shownAutos(laneId).map((a) => <AutomationHead key={a.paramId} paramId={a.paramId} height={AUTO_H} />);
+  const autoLanes = (laneId: string) => shownAutos(laneId).map((a) => <AutomationLane key={a.paramId} paramId={a.paramId} points={a.points} pxPerBeat={BEAT_W} width={totalW} height={AUTO_H} />);
+
   return (
     <section
       className="studio-card"
@@ -746,8 +757,8 @@ export function Arrangement() {
             <span className="studio-corner-badge">{lanes.length}</span>
           </div>
           {orderedLanes.map((lane, index) => (
+            <Fragment key={lane.id}>
             <div
-              key={lane.id}
               className="studio-track-head"
               data-track-head={lane.id}
               data-disabled={String(disabledTracks.has(lane.id))}
@@ -800,15 +811,31 @@ export function Arrangement() {
                     <button
                       className="studio-arm"
                       type="button"
-                      data-armed={String(armedTrackId === lane.id)}
+                      data-armed={String(armedTrackIds.includes(lane.id))}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setArmedTrackId(lane.id);
+                        toggleArmedTrack(lane.id);
                       }}
-                      title={armedTrackId === lane.id ? 'Armed: the record button writes to this track' : 'Arm this track for recording'}
+                      title={armedTrackIds.includes(lane.id) ? 'Armed: recording writes to this track. Click to disarm. Several tracks can be armed.' : 'Arm this track for recording (several tracks can be armed at once)'}
                       aria-label={`Arm ${lane.name} for recording`}
-                      aria-pressed={armedTrackId === lane.id}
+                      aria-pressed={armedTrackIds.includes(lane.id)}
                     />
+                  )}
+                  {autosOf(lane.id).length > 0 && (
+                    <button
+                      type="button"
+                      className="studio-auto-toggle"
+                      data-on={String(shownAutos(lane.id).length > 0)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const anyShown = shownAutos(lane.id).length > 0;
+                        for (const a of autosOf(lane.id)) setAutomationHidden(a.paramId, anyShown);
+                      }}
+                      title={shownAutos(lane.id).length > 0 ? 'Hide this track\'s automation lanes' : 'Show this track\'s automation lanes'}
+                      aria-pressed={shownAutos(lane.id).length > 0}
+                    >
+                      A
+                    </button>
                   )}
                   <div className="studio-msr-group">
                     <button
@@ -843,14 +870,14 @@ export function Arrangement() {
                     type="range"
                     min={0}
                     max={100}
-                    value={Math.round((trackVolumes[lane.id] ?? 1) * 100)}
+                    value={Math.round((trackVolumes[lane.id] ?? DEFAULT_TRACK_VOLUME) * 100)}
                     onChange={(e) => setTrackVolume(lane.id, Number(e.target.value) / 100)}
                     onClick={(e) => e.stopPropagation()}
-                    style={{ background: volumeFill(trackVolumes[lane.id] ?? 1) }}
+                    style={{ background: volumeFill(trackVolumes[lane.id] ?? DEFAULT_TRACK_VOLUME) }}
                     data-driven={String(isDriven(`track:${lane.id}:vol`))}
                     onContextMenu={(e) => { e.stopPropagation(); openMenu(e, buildParamMenu(`track:${lane.id}:vol`)); }}
                     aria-label={`${lane.name} volume`}
-                    title={`Volume ${Math.round((trackVolumes[lane.id] ?? 1) * 100)}%`}
+                    title={`Volume ${Math.round((trackVolumes[lane.id] ?? DEFAULT_TRACK_VOLUME) * 100)}%`}
                   />
                   <input
                     className="studio-pan"
@@ -893,7 +920,7 @@ export function Arrangement() {
                       )}
                     </>
                   )}
-                  {armedTrackId === lane.id && !isLayerLane(lane.id) && (
+                  {armedTrackIds.includes(lane.id) && !isLayerLane(lane.id) && (
                     <button
                       className="studio-mini-btn"
                       type="button"
@@ -958,7 +985,10 @@ export function Arrangement() {
                 </div>
               </div>
             </div>
+            {autoHeads(lane.id)}
+            </Fragment>
           ))}
+          {autoHeads('master')}
           <button
             className="studio-add-track"
             type="button"
@@ -1003,8 +1033,8 @@ export function Arrangement() {
               {loop?.enabled && <div className="studio-loop-shade" style={{ left: (loop.startMs / msPerBar) * BAR_W, width: ((loop.endMs - loop.startMs) / msPerBar) * BAR_W }} aria-hidden="true" />}
               {timeSelection && <div className="studio-tsel" style={{ left: (timeSelection.startMs / msPerBar) * BAR_W, width: ((timeSelection.endMs - timeSelection.startMs) / msPerBar) * BAR_W }} aria-hidden="true" />}
               {orderedLanes.map((lane, i) => (
+                <Fragment key={lane.id}>
                 <div
-                  key={lane.id}
                   className="studio-lane"
                   data-alt={String(i % 2 === 1)}
                   data-track={lane.id}
@@ -1108,7 +1138,10 @@ export function Arrangement() {
                     );
                   })}
                 </div>
+                {autoLanes(lane.id)}
+                </Fragment>
               ))}
+              {autoLanes('master')}
             </div>
 
             {/* Lines up with the + Track button under the track headers. */}

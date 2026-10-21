@@ -17,9 +17,16 @@ import { MidiEditor } from './components/studio/MidiEditor';
 import { WarpUI } from './components/studio/WarpUI';
 import { Mixer } from './components/studio/Mixer';
 import { ModDrawer } from './components/studio/ModDrawer';
-import { startMidiEngine } from './midi/midiEngine';
+import { laneInstrument, startMidiEngine } from './midi/midiEngine';
 import { startMidiInput } from './midi/midiInput';
 import { startModEngine } from './mod/modEngine';
+
+/** True while the computer keyboard plays notes: a MIDI clip on a synth track is selected. */
+function pianoKeysLive(): boolean {
+  const s = useSessionStore.getState();
+  const clip = s.selectedClip && s.midiClips.find((c) => c.id === s.selectedClip!.clipId);
+  return !!clip && laneInstrument(clip.laneId)?.kind === 'synth';
+}
 
 function App() {
   const viewMode = useSessionStore((s) => s.viewMode);
@@ -53,9 +60,25 @@ function App() {
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const st = useSessionStore.getState();
+      // F5 toggles the browser and F8 the mixer, even while typing (and F5 never reloads the page).
+      if (e.code === 'F5' || e.code === 'F8') {
+        e.preventDefault();
+        if (e.code === 'F5') st.toggleBrowser();
+        else st.setViewMode(st.viewMode === 'mixer' ? 'arrange' : 'mixer');
+        return;
+      }
       // Don't trigger if user is typing in inputs or select elements
       const activeTag = document.activeElement?.tagName;
       if (activeTag === 'INPUT' || activeTag === 'SELECT' || activeTag === 'TEXTAREA') {
+        return;
+      }
+
+      // B and M: browser and mixer. While a synth clip is being edited those two are piano keys, so there only F5 and F8 work.
+      if ((e.code === 'KeyB' || e.code === 'KeyM') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && !pianoKeysLive()) {
+        e.preventDefault();
+        if (e.code === 'KeyB') st.toggleBrowser();
+        else st.setViewMode(st.viewMode === 'mixer' ? 'arrange' : 'mixer');
         return;
       }
 

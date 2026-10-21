@@ -1,7 +1,7 @@
 import { Select } from './Select';
 import { useEffect, useMemo, useRef } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
-import { adsrValue, DIVISIONS, LFO_SHAPES, lfoPhase, lfoValue, type AutoPoint, type EnvMod, type LfoMod, type LfoShape, type Modulator } from '../../mod/modCore';
+import { adsrValue, DIVISIONS, LFO_SHAPES, lfoPhase, lfoValue, type EnvMod, type LfoMod, type LfoShape, type Modulator } from '../../mod/modCore';
 import { describeParam } from '../../mod/params';
 import { modLevel } from '../../mod/modEngine';
 import { Unit } from './InstrumentPanels';
@@ -166,118 +166,28 @@ function EnvControls({ m }: { m: EnvMod }) {
   );
 }
 
-// ------------------------------------------------------------------ automation
-const BAR_PX = 56;
-const ROW_H = 84;
-
-function AutomationRow({ paramId, points }: { paramId: string; points: AutoPoint[] }) {
-  const setPoints = useSessionStore((s) => s.setAutomationPoints);
-  const remove = useSessionStore((s) => s.removeAutomation);
-  const bpm = useSessionStore((s) => s.bpm);
-  const transport = useSessionStore((s) => s.transportTimeMs);
-  const dragging = useRef<number | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const desc = describeParam(paramId);
-  const lastBeat = points.length ? points[points.length - 1].beat : 0;
-  const bars = Math.max(8, Math.ceil(lastBeat / 4) + 2);
-  const W = bars * BAR_PX;
-  const beatPx = BAR_PX / 4;
-  const x = (beat: number) => beat * beatPx;
-  const y = (v: number) => (1 - v) * (ROW_H - 12) + 6;
-
-  const at = (e: React.PointerEvent) => {
-    const r = svgRef.current!.getBoundingClientRect();
-    const beat = Math.max(0, Math.round((e.clientX - r.left) / beatPx * 4) / 4);
-    const value = Math.min(1, Math.max(0, 1 - (e.clientY - r.top - 6) / (ROW_H - 12)));
-    return { beat, value };
-  };
-
-  const label = desc?.label ?? paramId;
-  const playBeat = transport / (60_000 / bpm);
-  return (
-    <div className="auto-row">
-      <div className="auto-head">
-        <span className="auto-name" title={label}>{label}</span>
-        <button type="button" className="studio-mini-btn" onClick={() => setPoints(paramId, [{ beat: 0, value: points[0]?.value ?? 0.5 }, { beat: 16, value: points[0]?.value ?? 0.5 }])} title="Flatten the curve">Flatten</button>
-        <button type="button" className="studio-mini-btn" onClick={() => remove(paramId)}>Remove</button>
-        <span className="mod-hint">Click to add a point · drag to move · double-click a point to delete</span>
-      </div>
-      <div className="auto-scroll">
-        <svg
-          ref={svgRef} width={W} height={ROW_H} className="auto-svg"
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            const { beat, value } = at(e);
-            const hit = points.findIndex((p) => Math.abs(x(p.beat) - (e.clientX - svgRef.current!.getBoundingClientRect().left)) < 7 && Math.abs(y(p.value) - (e.clientY - svgRef.current!.getBoundingClientRect().top)) < 9);
-            e.currentTarget.setPointerCapture(e.pointerId);
-            if (hit >= 0) { dragging.current = hit; return; }
-            const next = [...points, { beat, value }].sort((a, b) => a.beat - b.beat);
-            dragging.current = next.findIndex((p) => p.beat === beat && p.value === value);
-            setPoints(paramId, next);
-          }}
-          onPointerMove={(e) => {
-            if (dragging.current === null) return;
-            const { beat, value } = at(e);
-            const next = points.map((p, i) => (i === dragging.current ? { beat, value } : p));
-            setPoints(paramId, next);
-            // keep following the same point after the list re-sorts
-            dragging.current = [...next].sort((a, b) => a.beat - b.beat).findIndex((p) => p.beat === beat && p.value === value);
-          }}
-          onPointerUp={() => { dragging.current = null; }}
-          onDoubleClick={(e) => {
-            const r = svgRef.current!.getBoundingClientRect();
-            const hit = points.findIndex((p) => Math.abs(x(p.beat) - (e.clientX - r.left)) < 8 && Math.abs(y(p.value) - (e.clientY - r.top)) < 10);
-            if (hit >= 0 && points.length > 1) setPoints(paramId, points.filter((_, i) => i !== hit));
-          }}
-        >
-          {Array.from({ length: bars + 1 }).map((_, b) => <line key={b} x1={b * BAR_PX} x2={b * BAR_PX} y1={0} y2={ROW_H} className="auto-grid" data-bar="true" />)}
-          {Array.from({ length: bars * 4 }).map((_, i) => <line key={`q${i}`} x1={i * beatPx} x2={i * beatPx} y1={0} y2={ROW_H} className="auto-grid" />)}
-          <polyline className="auto-line" fill="none" points={[`0,${y(points[0]?.value ?? 0)}`, ...points.map((p) => `${x(p.beat)},${y(p.value)}`), `${W},${y(points[points.length - 1]?.value ?? 0)}`].join(' ')} />
-          {points.map((p, i) => <circle key={i} className="auto-pt" cx={x(p.beat)} cy={y(p.value)} r={5} />)}
-          <line className="auto-play" x1={x(playBeat)} x2={x(playBeat)} y1={0} y2={ROW_H} />
-        </svg>
-      </div>
-    </div>
-  );
-}
-
 /** The global modulator section: it drops down from the top bar. Modulators are small LFOs and envelopes that
  *  can be mapped to any knob or slider (right-click it); automation curves play along the timeline. */
 export function ModDrawer() {
   const open = useSessionStore((s) => s.modDrawerOpen);
   const setOpen = useSessionStore((s) => s.setModDrawerOpen);
-  const tab = useSessionStore((s) => s.modTab);
-  const setTab = useSessionStore((s) => s.setModTab);
   const modulators = useSessionStore((s) => s.modulators);
-  const automation = useSessionStore((s) => s.automation);
   const add = useSessionStore((s) => s.addModulator);
 
   return (
     <section className="mod-drawer" data-open={String(open)} aria-label="Modulators" aria-hidden={!open}>
       <div className="mod-drawer-inner">
         <div className="mod-tabs">
-          <button type="button" data-on={String(tab === 'mods')} onClick={() => setTab('mods')}>Modulators <span>{modulators.length}</span></button>
-          <button type="button" data-on={String(tab === 'auto')} onClick={() => setTab('auto')}>Automation <span>{automation.length}</span></button>
+          <span className="mod-title">Modulators <span>{modulators.length}</span></span>
           <div className="studio-head-spacer" />
-          {tab === 'mods' && (
-            <>
-              <button type="button" className="studio-mini-btn" onClick={() => add('lfo')}>+ LFO</button>
-              <button type="button" className="studio-mini-btn" onClick={() => add('adsr')}>+ Envelope</button>
-            </>
-          )}
+          <button type="button" className="studio-mini-btn" onClick={() => add('lfo')}>+ LFO</button>
+          <button type="button" className="studio-mini-btn" onClick={() => add('adsr')}>+ Envelope</button>
           <button type="button" className="studio-mini-btn" onClick={() => setOpen(false)} aria-label="Close modulators" title="Close">▲</button>
         </div>
-        {tab === 'mods' ? (
-          <div className="mod-cards">
-            {modulators.length === 0 && <div className="mod-empty">No modulators yet. Add an LFO or an envelope, then right-click any knob or slider to map it.</div>}
-            {modulators.map((m) => <ModCard key={m.id} mod={m} />)}
-          </div>
-        ) : (
-          <div className="auto-list">
-            {automation.length === 0 && <div className="mod-empty">Nothing automated. Right-click a knob or slider and choose Automate.</div>}
-            {automation.map((a) => <AutomationRow key={a.paramId} paramId={a.paramId} points={a.points} />)}
-          </div>
-        )}
+        <div className="mod-cards">
+          {modulators.length === 0 && <div className="mod-empty">No modulators yet. Add an LFO or an envelope, then right-click any knob or slider to map it. (Automation lives in its own lane under each track: right-click a control and choose Automate.)</div>}
+          {modulators.map((m) => <ModCard key={m.id} mod={m} />)}
+        </div>
       </div>
     </section>
   );

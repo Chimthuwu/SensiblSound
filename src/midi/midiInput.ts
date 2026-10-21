@@ -41,9 +41,10 @@ interface OpenNote { lane: string; pitch: number; atMs: number; vel: number }
 const open = new Map<string, OpenNote>();
 const GRID = 0.125; // record to 32nd notes: tight, but still feels played
 
-const recordingLane = (): string | null => {
+/** Whether notes on this track are being recorded right now: recording, and the track is one of the armed ones. */
+const isRecordingLane = (lane: string): boolean => {
   const s = useSessionStore.getState();
-  return s.isRecording && hasInstrument(s.armedTrackId) ? s.armedTrackId : null;
+  return s.isRecording && s.armedTrackIds.includes(lane) && hasInstrument(lane);
 };
 
 function commitNote(n: OpenNote, endMs: number) {
@@ -94,7 +95,7 @@ function playFxEvents(lane: string, events: FxNote[], holdFirst: boolean, track?
   const mpb = msPerBeat();
   const synth = laneInstrument(lane)?.kind === 'synth';
   for (const e of events) {
-    const captureOutput = recordingLane() === lane && useSessionStore.getState().midiRecordSource === 'output';
+    const captureOutput = isRecordingLane(lane) && useSessionStore.getState().midiRecordSource === 'output';
     const at = useSessionStore.getState().transportTimeMs + e.startBeat * mpb;
     if (e.startBeat <= 1e-6) {
       previewNote(lane, e.pitch, e.vel, holdFirst && synth, Math.max(0.05, (e.lenBeats * mpb) / 1000));
@@ -143,9 +144,24 @@ function stopLiveArpIfIdle(lane: string) {
 }
 
 /** A key goes down. Plays the target track's instrument (through its MIDI FX) and, when recording, captures the note. */
+/** The tracks a played note goes to: the one asked for, else every armed instrument track, else the selected one. */
+function liveLanes(laneOverride?: string): string[] {
+  if (laneOverride && hasInstrument(laneOverride)) return [laneOverride];
+  const armed = useSessionStore.getState().armedTrackIds.filter(hasInstrument);
+  if (armed.length) return armed;
+  const t = targetLane();
+  return t ? [t] : [];
+}
+
 export function liveNoteOn(pitchIn: number, vel = 0.85, laneOverride?: string) {
-  const lane = laneOverride && hasInstrument(laneOverride) ? laneOverride : targetLane();
-  if (!lane) return;
+  for (const lane of liveLanes(laneOverride)) noteOnLane(lane, pitchIn, vel);
+}
+
+export function liveNoteOff(pitchIn: number, laneOverride?: string) {
+  for (const lane of liveLanes(laneOverride)) noteOffLane(lane, pitchIn);
+}
+
+function noteOnLane(lane: string, pitchIn: number, vel: number) {
   const rig = laneInstrument(lane);
   const pitch = rig?.kind === 'drums' ? mapDrumNote(pitchIn) : pitchIn;
   const key = `${lane}:${pitch}`;
@@ -162,17 +178,14 @@ export function liveNoteOn(pitchIn: number, vel = 0.85, laneOverride?: string) {
     liveHeld.set(key, held);
     playFxEvents(lane, events, true, held);
   }
-  const rec = recordingLane();
-  if (rec === lane && useSessionStore.getState().midiRecordSource === 'played') {
+  if (isRecordingLane(lane) && useSessionStore.getState().midiRecordSource === 'played') {
     const prev = open.get(key);
     if (prev) commitNote(prev, useSessionStore.getState().transportTimeMs);
     open.set(key, { lane, pitch, atMs: useSessionStore.getState().transportTimeMs, vel });
   }
 }
 
-export function liveNoteOff(pitchIn: number, laneOverride?: string) {
-  const lane = laneOverride && hasInstrument(laneOverride) ? laneOverride : targetLane();
-  if (!lane) return;
+function noteOffLane(lane: string, pitchIn: number) {
   const rig = laneInstrument(lane);
   const pitch = rig?.kind === 'drums' ? mapDrumNote(pitchIn) : pitchIn;
   const key = `${lane}:${pitch}`;

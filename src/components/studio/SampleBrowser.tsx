@@ -15,7 +15,6 @@ import {
   type SampleInfo,
 } from '../../utils/samples';
 
-const BROWSER_COLLAPSED_KEY = 'studio-browser-collapsed';
 const PREVIEW_SNAP_KEY = 'studio-preview-snap';
 
 const CATEGORY_ORDER: SampleCategory[] = ['Drums', 'Bass', 'Synth', 'FX', 'Loops', 'Imported'];
@@ -116,25 +115,9 @@ export function SampleBrowser() {
   const [query, setQuery] = useState('');
   const [imports, setImports] = useState<SampleInfo[]>(() => importedSamples());
   const [previewId, setPreviewId] = useState<string | null>(null);
-  // Collapsed frees the room for the arranger. Remembered per browser.
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(BROWSER_COLLAPSED_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
-  const toggleCollapsed = () => {
-    setCollapsed((c) => {
-      const next = !c;
-      try {
-        localStorage.setItem(BROWSER_COLLAPSED_KEY, next ? '1' : '0');
-      } catch {
-        // Storage may be blocked; the toggle still works for this visit.
-      }
-      return next;
-    });
-  };
+  // Folded away to free room for the arranger. Shared with the keyboard (F5 or B) and remembered per browser.
+  const collapsed = useSessionStore((st) => st.browserCollapsed);
+  const toggleCollapsed = useSessionStore((st) => st.toggleBrowser);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const q = query.trim().toLowerCase();
@@ -198,7 +181,7 @@ export function SampleBrowser() {
         onClick={toggleCollapsed}
         aria-expanded={!collapsed}
         aria-label={collapsed ? 'Show sample browser' : 'Hide sample browser'}
-        title={collapsed ? 'Show browser' : 'Hide browser to make room'}
+        title={collapsed ? 'Show browser (F5 or B)' : 'Hide browser to make room (F5 or B)'}
       >
         {collapsed ? '‹' : '›'}
       </button>

@@ -8,14 +8,16 @@ export function buildParamMenu(paramId: string): MenuItem[] {
   const desc = describeParam(paramId);
   if (!desc) return [];
   const st = useSessionStore.getState();
-  const openDrawer = (tab: 'mods' | 'auto') => { st.setModTab(tab); st.setModDrawerOpen(true); };
+  const openDrawer = (tab: 'mods') => { st.setModTab(tab); st.setModDrawerOpen(true); };
+  /** Automation lives in a lane under its track: make sure it is shown, and that the arrangement is on screen. */
+  const showAutomation = () => { const s = useSessionStore.getState(); s.setAutomationHidden(paramId, false); s.setViewMode('arrange'); };
   const auto = st.automation.find((a) => a.paramId === paramId);
   const mappings = st.modMappings.filter((m) => m.paramId === paramId);
 
   const items: MenuItem[] = [{ label: desc.label, disabled: true, onSelect: () => {} }, { kind: 'separator' }];
 
   if (auto) {
-    items.push({ label: 'Edit automation', onSelect: () => openDrawer('auto') });
+    items.push({ label: st.automationHidden[paramId] ? 'Show automation lane' : 'Edit automation', onSelect: showAutomation });
     items.push({ label: 'Remove automation', danger: true, onSelect: () => useSessionStore.getState().removeAutomation(paramId) });
   } else {
     items.push({
@@ -23,7 +25,7 @@ export function buildParamMenu(paramId: string): MenuItem[] {
       onSelect: () => {
         const n = toNorm(desc, desc.get());
         useSessionStore.getState().addAutomation(paramId, [{ beat: 0, value: n }, { beat: 16, value: n }]);
-        openDrawer('auto');
+        showAutomation();
       },
     });
   }
