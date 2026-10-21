@@ -3,6 +3,8 @@ import { FileAudio, Volume2, VolumeX, Trash2 } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { TimeRuler } from './TimeRuler';
+import { TrackDecor } from './TrackDecor';
+import { useTrackLayout } from '../../hooks/useTrackLayout';
 
 export function BackingTrack() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -13,8 +15,9 @@ export function BackingTrack() {
   const isTrackSoloed = soloedTracks.has(trackId);
   const isAnyTrackSoloed = soloedTracks.size > 0;
   const forceMute = isGlobalMuted || (isAnyTrackSoloed && !isTrackSoloed);
+  const layout = useTrackLayout(trackId, 128);
 
-  const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, backingTrack?.url, { blob: backingTrack?.blob, forceMute });
+  const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(containerRef, backingTrack?.url, { blob: backingTrack?.blob, forceMute, waveHeight: layout.waveHeight });
   const [isDragging, setIsDragging] = useState(false);
 
   // Feed the decoded duration back into the store — the vocal-layer timeline
@@ -59,7 +62,8 @@ export function BackingTrack() {
   };
 
   return (
-    <section className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group h-32">
+    <section className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group" style={{ height: layout.height }} onMouseDown={layout.onMouseDown}>
+      <TrackDecor trackId={trackId} {...layout} />
       {/* Left Sidebar */}
       <div className="w-full md:w-64 p-3 md:p-4 flex flex-col justify-between border-b md:border-b-0 md:border-r border-white/10 bg-[#141416] shrink-0 z-20">
         <div className="flex items-center justify-between">

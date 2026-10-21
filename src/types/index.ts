@@ -40,6 +40,14 @@ export interface RecordingMeta {
   mimeType?: string;
 }
 
+// A Bitwig-style track group: members select, resize, mute and solo together.
+export interface TrackGroup {
+  id: string;
+  name: string;
+  color: string;
+  trackIds: string[];
+}
+
 export interface FxSettings {
   autotuneEnabled: boolean;
   compressorEnabled: boolean;
@@ -88,6 +96,9 @@ export interface SessionState {
   recordingsHistory: RecordingMeta[]; // Every recording ever made this browser, independent of the active session
   mutedTracks: Set<string>;
   soloedTracks: Set<string>;
+  selectedTracks: Set<string>;
+  trackHeights: Record<string, number>; // Row heights in px, keyed by track id
+  groups: TrackGroup[];
 
   // Actions
   setBpm: (bpm: number) => void;
@@ -117,4 +128,10 @@ export interface SessionState {
   addRecordingHistoryEntry: (entry: RecordingMeta) => void;
   toggleMuteTrack: (trackId: string) => void;
   toggleSoloTrack: (trackId: string) => void;
+  selectTrack: (trackId: string, additive: boolean) => void;
+  selectAllTracks: (trackIds: string[]) => void;
+  clearSelection: () => void;
+  setTrackHeights: (trackIds: string[], height: number) => void;
+  groupSelected: () => void;
+  ungroupSelected: () => void;
 }
