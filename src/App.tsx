@@ -1,26 +1,31 @@
 import { useEffect } from 'react';
 import { useSessionStore } from './stores/useSessionStore';
-import { Play, Square, Circle, Mic2, Settings, Activity, Share2, SkipBack, HardDrive } from 'lucide-react';
 import { googleDrive } from './lib/googleDrive';
-import { BackingTrack } from './components/tracks/BackingTrack';
-import { VocalTrack } from './components/tracks/VocalTrack';
-import { VocalFxRack } from './components/effects/VocalFxRack';
+
+
 import { useMetronome } from './hooks/useMetronome';
 import { useTempoDetector } from './hooks/useTempoDetector';
 import { useTimer } from './hooks/useTimer';
 
-// Transport scrubber max length (10 minutes). Hardcoded for the MVP; could
-// later be derived from the longest loaded audio's duration.
-const TRANSPORT_MAX_MS = 600_000;
+import { Arrangement } from './components/studio/Arrangement';
+import { AudioEngine } from './components/studio/AudioEngine';
+import { FXRack } from './components/studio/FXRack';
+import { TopBar } from './components/studio/TopBar';
+import { TransportBar } from './components/studio/TransportBar';
+import { SampleBrowser } from './components/studio/SampleBrowser';
+import { MidiEditor } from './components/studio/MidiEditor';
+import { WarpUI } from './components/studio/WarpUI';
+import { Mixer } from './components/studio/Mixer';
+import { startMidiEngine } from './midi/midiEngine';
+import { startMidiInput } from './midi/midiInput';
 
 function App() {
+  const viewMode = useSessionStore((s) => s.viewMode);
   const {
-    isRecording, isPlaying, bpm, setBpm, backupStatus, cloudBackupStatus, setIsRecording, setIsPlaying,
-    isMetronomeEnabled, setIsMetronomeEnabled, metronomeVolume, setMetronomeVolume,
-    transportTimeMs, setTransportTimeMs, rewindTransport, activeTake, layers,
-    driveBackupStatus, driveConnection, setDriveConnection, fxEnabled, setFxEnabled
+    isRecording, isPlaying, setIsRecording, setIsPlaying,
+    rewindTransport, activeTake, layers,
+    driveConnection, setDriveConnection
   } = useSessionStore();
-
   useEffect(() => {
     if (driveConnection === 'unavailable') return;
     googleDrive.reconnectSilently().then((connected) => {
@@ -28,20 +33,17 @@ function App() {
     });
   }, [driveConnection, setDriveConnection]);
 
-  const handleDriveConnect = async () => {
-    try {
-      await googleDrive.connect();
-      setDriveConnection('connected');
-    } catch (err) {
-      console.warn('Google Drive connection failed', err);
-    }
-  };
-
-
   // Initialize smart helpers
   useMetronome();
   const { showPrompt, detectedBpm, acceptDetectedBpm, dismissPrompt } = useTempoDetector();
-  const { formattedTime } = useTimer();
+  // Drives transportTimeMs while playing/recording. Without it the playhead,
+  // timecode and recording start offsets never move.
+  useTimer();
+
+  // MIDI playback scheduler: follows the transport.
+  useEffect(() => startMidiEngine(), []);
+  // External MIDI controllers: notes play the selected instrument and record while a track is armed.
+  useEffect(() => startMidiInput(), []);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -100,7 +102,6 @@ function App() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-surface border border-white/10 rounded-xl p-6 shadow-2xl max-w-md w-full flex flex-col gap-4">
             <div className="flex items-center gap-3 text-primary">
-              <Activity size={24} />
               <h2 className="text-lg font-semibold text-white">Tempo Detected</h2>
             </div>
             <p className="text-zinc-400 text-sm">
@@ -125,243 +126,23 @@ function App() {
         </div>
       )}
 
-      {/* Top Header / Navigation */}
-      <header className="h-auto md:h-16 py-3 md:py-0 border-b border-white/[0.04] flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-8 gap-4 bg-background/80 backdrop-blur-md relative z-30">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-sm shrink-0">
-            <Mic2 size={16} />
-          </div>
-          <h1 className="font-semibold text-base tracking-tight text-white font-sans whitespace-nowrap">Sensible Soundlabs</h1>
-        </div>
-        
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 no-scrollbar text-xs font-medium hide-scrollbar whitespace-nowrap justify-between md:justify-end">
-          
-          {/* ANDROID (Mobile) ONLY: FX Dropdown */}
-          <div className="flex md:hidden items-center w-full justify-between">
-            <select 
-              value={fxEnabled ? 'on' : 'off'}
-              onChange={(e) => setFxEnabled(e.target.value === 'on')}
-              className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-zinc-300 outline-none focus:border-primary/50 transition-all cursor-pointer font-sans w-full"
-            >
-              <option value="on">AUDIO FX: ON</option>
-              <option value="off">AUDIO FX: OFF</option>
-            </select>
-          </div>
+      <TopBar />
+      <WarpUI />
 
-          {/* DESKTOP ONLY: Backup statuses and extra buttons */}
-          <div className="hidden md:flex items-center gap-2">
-            {/* Local (IndexedDB) save is the guarantee that matters most, so
-                it stays fully visible (not dimmed) when it fails — that's the
-                moment she most needs to notice. */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] transition-all duration-300 ${
-              backupStatus === 'failed' ? '' : 'opacity-60 hover:opacity-100'
-            }`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                backupStatus === 'success' ? 'bg-emerald-500' :
-                backupStatus === 'uploading' ? 'bg-amber-500 animate-pulse' :
-                backupStatus === 'failed' ? 'bg-rose-500 animate-pulse' : 'bg-zinc-600'
-              }`} />
-              <span className={`font-sans tracking-wide ${backupStatus === 'failed' ? 'text-rose-400 font-semibold' : 'text-zinc-400'}`}>
-                {backupStatus === 'idle' && 'Not Backed Up Yet'}
-                {backupStatus === 'uploading' && 'Saving to This Device…'}
-                {backupStatus === 'success' && 'Saved on This Device'}
-                {backupStatus === 'failed' && 'Save Failed — Download Now!'}
-              </span>
-            </div>
+      {/* Headless: mounts the mic/recording engine and transport-synced
+          playback for the backing track, active take and layers. */}
+      <AudioEngine />
 
-            {/* Real Firebase Storage cloud backup, tracked independently of
-                local save — a cloud failure isn't alarming on its own (local +
-                download already cover her), so this one stays quietly dimmed
-                even when it fails. */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] opacity-60 hover:opacity-100 transition-all duration-300">
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                cloudBackupStatus === 'success' ? 'bg-emerald-500' :
-                cloudBackupStatus === 'uploading' ? 'bg-amber-500 animate-pulse' :
-                cloudBackupStatus === 'failed' ? 'bg-rose-500' : 'bg-zinc-600'
-              }`} />
-              <span className="font-sans tracking-wide text-zinc-400">
-                {cloudBackupStatus === 'idle' && 'Cloud Backup Ready'}
-                {cloudBackupStatus === 'uploading' && 'Backing Up to Cloud…'}
-                {cloudBackupStatus === 'success' && 'Backed Up to Cloud'}
-                {cloudBackupStatus === 'failed' && 'Cloud Backup Unavailable'}
-              </span>
-            </div>
-
-            {driveConnection !== 'unavailable' && (
-              driveConnection === 'connected' ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] opacity-60 hover:opacity-100 transition-all duration-300">
-                  <HardDrive size={13} className="text-zinc-400" />
-                  <div className={`w-1.5 h-1.5 rounded-full ${
-                    driveBackupStatus === 'success' ? 'bg-emerald-500' :
-                    driveBackupStatus === 'uploading' ? 'bg-amber-500 animate-pulse' :
-                    driveBackupStatus === 'failed' ? 'bg-rose-500' : 'bg-zinc-600'
-                  }`} />
-                  <span className="font-sans tracking-wide text-zinc-400">
-                    {driveBackupStatus === 'idle' && 'Drive Ready'}
-                    {driveBackupStatus === 'uploading' && 'Saving to Drive…'}
-                    {driveBackupStatus === 'success' && 'Saved to Drive'}
-                    {driveBackupStatus === 'failed' && 'Drive Backup Failed'}
-                  </span>
-                </div>
-              ) : (
-                <button 
-                  onClick={handleDriveConnect}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-white/[0.03] opacity-60 hover:opacity-100 transition-all duration-300 text-zinc-400 hover:text-white cursor-pointer"
-                >
-                  <HardDrive size={13} />
-                  <span className="font-sans tracking-wide">Connect Drive</span>
-                </button>
-              )
-            )}
-
-            <a 
-              href="https://github.com/Chimthuwu/SensiblSound/releases/download/v1.0.0/Sensi.Soundlabs.Setup.0.0.0.exe"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0 inline-flex items-center"
-            >
-              Desktop DL
-            </a>
-            <a 
-              href="https://github.com/Chimthuwu/SensiblSound/releases/download/v1.0.0/SENSI-SOUNDLABS-ANDROID.apk"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.05] hover:border-white/[0.1] px-4 py-1.5 rounded-lg transition-all cursor-pointer font-sans font-semibold text-zinc-200 shrink-0 inline-flex items-center"
-            >
-              Android APK DL
-            </a>
-
-            <button className="text-xs bg-primary/10 hover:bg-primary/25 text-primary font-semibold px-4 py-1.5 rounded-lg transition-all duration-300 border border-primary/15 hover:border-primary/30 flex items-center gap-2 cursor-pointer shrink-0">
-              <Share2 size={13} />
-              Share Project
-            </button>
-            <button className="p-2 hover:bg-white/[0.04] rounded-lg text-zinc-400 hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/[0.05] shrink-0">
-              <Settings size={16} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Studio Area */}
-      <main className="flex-1 flex flex-col p-4 md:p-8 gap-4 md:gap-6 max-w-6xl mx-auto w-full relative z-10">
-        <BackingTrack />
-        
-        {/* Clean hardware-like visual connector divider */}
-        <div className="flex items-center gap-4 px-2 my-1">
-          <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
-          <div className="text-[10px] uppercase font-bold tracking-[0.2em] text-zinc-600 font-sans">Signal Flow</div>
-          <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
-        </div>
-
-        <VocalTrack />
-        <VocalFxRack />
+      <div className="studio-shell">
+      <main className="studio">
+        {viewMode === 'mixer' ? <Mixer /> : <Arrangement />}
+        <MidiEditor />
+        <FXRack />
       </main>
+      <SampleBrowser />
+      </div>
 
-      {/* Transport Controls (Bottom Bar) */}
-      <footer className="sticky bottom-0 mt-auto border-t border-white/[0.04] bg-[#0c0c0e]/95 backdrop-blur-md flex flex-col md:flex-row items-center justify-between px-3 md:px-12 z-40 py-3 md:py-2 gap-3 md:gap-0">
-        
-        {/* Left Side: BPM & Metronome */}
-        <div className="flex items-center justify-start gap-3 md:gap-6 w-full md:w-1/3">
-          {/* BPM */}
-          <div className="flex flex-col">
-            <span className="text-[9px] md:text-[10px] text-zinc-500 font-bold uppercase tracking-wider hidden md:block">Tempo</span>
-            <div className="flex items-baseline gap-0.5 md:gap-1 mt-0.5">
-              <input 
-                type="number" 
-                value={bpm}
-                onChange={(e) => setBpm(Number(e.target.value) || 120)}
-                className="w-10 md:w-16 bg-transparent text-lg md:text-2xl font-bold font-mono text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <span className="text-[9px] md:text-[10px] text-zinc-500 font-semibold tracking-wider uppercase font-mono">BPM</span>
-            </div>
-          </div>
-          
-          <div className="h-6 md:h-8 w-[1px] bg-white/[0.08]" />
-          
-          <div className="flex flex-col gap-1 md:gap-1.5">
-            <div className="flex items-center gap-2 md:gap-3">
-              <button 
-                onClick={() => setIsMetronomeEnabled(!isMetronomeEnabled)}
-                className={`text-[9px] md:text-[10px] font-bold tracking-wider px-1.5 md:px-2 py-0.5 rounded transition-all duration-300 cursor-pointer ${
-                  isMetronomeEnabled ? 'bg-primary/20 text-primary border border-primary/25' : 'bg-white/[0.02] border border-white/[0.05] text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                CLICK
-              </button>
-              <input 
-                type="range" 
-                min="0" max="1" step="0.01" 
-                value={metronomeVolume}
-                onChange={(e) => setMetronomeVolume(parseFloat(e.target.value))}
-                className="w-12 md:w-20 accent-primary opacity-60 hover:opacity-100 transition-opacity cursor-pointer hidden md:block"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Center: Core Transport Controls + Scrubber */}
-        <div className="flex flex-col items-center justify-center gap-2 w-full md:w-1/3">
-          <div className="flex items-center justify-center gap-2 md:gap-4">
-            <button
-              className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border bg-white/[0.03] text-zinc-300 border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.1] hover:scale-105"
-              onClick={rewindTransport}
-              title="Rewind to start (Home)"
-            >
-              <SkipBack size={14} fill="currentColor" />
-            </button>
-
-            <button
-              className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border ${
-                isPlaying
-                  ? 'bg-primary text-white border-primary shadow-[0_0_15px_rgba(168,85,247,0.35)]'
-                  : 'bg-white/[0.03] text-zinc-300 border-white/[0.05] hover:bg-white/[0.08] hover:border-white/[0.1] hover:scale-105'
-              }`}
-              onClick={() => setIsPlaying(!isPlaying)}
-              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-            >
-              {isPlaying ? <Square size={14} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
-            </button>
-
-            <button
-              className={`w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer border ${
-                isRecording
-                  ? 'bg-red-500 text-white border-red-500 shadow-[0_0_25px_rgba(239,68,68,0.55)] scale-105 hover:bg-red-600'
-                  : 'bg-zinc-900 text-red-500 border-red-500/25 hover:border-red-500/60 hover:bg-zinc-800 shadow-[0_0_15px_rgba(239,68,68,0.05)] hover:scale-105'
-              }`}
-              onClick={() => setIsRecording(!isRecording)}
-              title={isRecording ? 'Stop Recording (R)' : 'Record (R)'}
-            >
-               {isRecording ? <Square size={16} fill="currentColor" /> : <Circle size={20} fill="currentColor" />}
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-3 w-full max-w-sm justify-center">
-            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider hidden md:block">Transport</span>
-            <input
-              type="range"
-              min="0"
-              max={TRANSPORT_MAX_MS}
-              step={50}
-              value={Math.min(transportTimeMs, TRANSPORT_MAX_MS)}
-              onChange={(e) => setTransportTimeMs(parseInt(e.target.value, 10))}
-              className="flex-1 accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-              title="Scrub transport position"
-            />
-            <div className="text-[11px] md:hidden font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)]">
-              {formattedTime}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Timecode (Desktop only) */}
-        <div className="hidden md:flex flex-col items-end justify-center w-1/3">
-          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mr-1">Timecode</span>
-          <div className="text-3xl lg:text-4xl font-bold font-mono tracking-widest text-primary drop-shadow-[0_0_8px_rgba(168,85,247,0.15)] selection:bg-transparent select-none mt-0.5">
-            {formattedTime}
-          </div>
-        </div>
-
-      </footer>
+      <TransportBar />
     </div>
   );
 }

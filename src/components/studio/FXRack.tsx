@@ -1,13 +1,56 @@
-import { useCallback, useMemo } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSessionStore } from '../../stores/useSessionStore';
+import { ALL_DEVICES, deviceStage, isInstrumentDevice, isNoteFxDevice, type DeviceId, type DeviceStage } from '../../types';
+import { NoteFxPanel } from './NoteFxPanels';
+import { NOTE_FX_DEFAULTS, type NoteFxType } from '../../midi/noteFx';
+import { DrumPanel, SynthPanel } from './InstrumentPanels';
 import { Knob } from './Knob';
-import { ParametricEQ, type EQBand } from './ParametricEQ';
+import { useContextMenu, type MenuItem } from './ContextMenu';
+import { ParametricEQ } from './ParametricEQ';
 
 // All twelve keys — the audio graph maps the note name through a 12-entry
 // table, so a short list silently made G# and A# unselectable.
 const KEYS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 // Must match the scales the FX graph actually implements (getScaleFrequencies).
 const SCALES = ['Major', 'Minor', 'Chromatic'];
+
+const DEVICE_NAMES: Record<DeviceId, string> = {
+  autotune: 'Autotune',
+  doubler: 'Doubler',
+  compressor: 'Dynamics',
+  eq: 'Parametric EQ',
+  delay: 'Delay',
+  reverb: 'Reverb',
+  synth: 'PsydeNote Lite',
+  drums: 'Drum Machine',
+  arp: 'Arpeggiator',
+  chord: 'Chord',
+  transpose: 'Transpose',
+  noteFilter: 'Note Filter',
+  echo: 'Note Echo',
+  scale: 'Scale',
+  randomize: 'Randomize',
+};
+
+// Short label on each device's on/off switch.
+const DEVICE_SWITCH_LABEL: Record<DeviceId, string> = {
+  autotune: 'Tune',
+  doubler: 'Doub',
+  compressor: 'Comp',
+  eq: 'EQ',
+  delay: 'Delay',
+  reverb: 'Verb',
+  synth: 'On',
+  drums: 'On',
+  arp: 'On',
+  chord: 'On',
+  transpose: 'On',
+  noteFilter: 'On',
+  echo: 'On',
+  scale: 'On',
+  randomize: 'On',
+};
 
 function Switch({
   checked,
@@ -66,129 +109,154 @@ function MiniSelect({
   );
 }
 
+// One-line descriptions for the device browser.
+const DEVICE_INFO: Record<DeviceId, string> = {
+  autotune: 'Pitch correction and T-Pain style autotune',
+  doubler: 'A second, offset copy for a wider vocal',
+  compressor: 'Evens out peaks so the vocal sits steady',
+  eq: 'Four-band parametric EQ',
+  delay: 'Echo with feedback',
+  reverb: 'Room tail behind the vocal',
+  synth: 'Instrument: a small PsydeNote with FM, two oscillators and a filter. Plays MIDI clips',
+  drums: 'Instrument: eight synthesised drum pads. Plays MIDI clips',
+  arp: 'Note FX: turns held notes into a stepped pattern',
+  chord: 'Note FX: adds up to four notes above every note',
+  transpose: 'Note FX: shifts notes by semitones and octaves',
+  noteFilter: 'Note FX: lets through only notes in a key and velocity range',
+  echo: 'Note FX: repeats notes, fading and shifting each repeat',
+  scale: 'Note FX: snaps notes to a key and scale',
+  randomize: 'Note FX: varies velocity, timing and pitch a little',
+};
+
+const STAGE_LABEL: Record<DeviceStage, string> = { midi: 'MIDI FX', instrument: 'Instrument', audio: 'Audio FX' };
+
+/** Marks where each stage of the rack starts. The rack flows MIDI FX, then instrument, then audio FX. */
+function StageLabel({ stage }: { stage: DeviceStage }) {
+  return (
+    <div className="studio-fx-stage" data-stage={stage} title="The rack flows MIDI FX, then instrument, then audio FX">
+      <span>{STAGE_LABEL[stage]}</span>
+    </div>
+  );
+}
+
+function trackName(trackId: string, extraName?: string): string {
+  if (trackId === 'backing') return 'Backing Track';
+  if (trackId === 'active_take') return 'Vocal Take';
+  return extraName ?? 'Layer';
+}
+
 export function FXRack() {
   const fxEnabled = useSessionStore((s) => s.fxEnabled);
   const setFxEnabled = useSessionStore((s) => s.setFxEnabled);
   const fxSettings = useSessionStore((s) => s.fxSettings);
   const setFxSettings = useSessionStore((s) => s.setFxSettings);
+  const selectedTrackId = useSessionStore((s) => s.selectedTrackId);
+  const trackDevices = useSessionStore((s) => s.trackDevices);
+  const midiFxParams = useSessionStore((s) => s.midiFxParams);
+  const setMidiFxParam = useSessionStore((s) => s.setMidiFxParam);
+  const extraTracks = useSessionStore((s) => s.extraTracks);
+  const addDevice = useSessionStore((s) => s.addDevice);
+  const removeDevice = useSessionStore((s) => s.removeDevice);
+  // Device browser: opened from the add slot at the end of the chain.
+  const [browserAnchor, setBrowserAnchor] = useState<{ left: number; bottom: number } | null>(null);
+  const addSlotRef = useRef<HTMLButtonElement>(null);
+  const browserRef = useRef<HTMLDivElement>(null);
+  const reorderDevice = useSessionStore((s) => s.reorderDevice);
+  const openMenu = useContextMenu();
+  const addDeviceItems = (): MenuItem[] =>
+    ALL_DEVICES.map((d) => ({ label: `Add ${DEVICE_NAMES[d]}`, onSelect: () => addDevice(selectedTrackId, d) }));
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [reorder, setReorder] = useState<{ from: number; over: number } | null>(null);
 
-  const eqBands: EQBand[] = useMemo(
-    () => [
-      { x: 0.14, g: fxSettings.eqLow / 12 },
-      { x: 0.45, g: fxSettings.eqMid / 12 },
-      { x: 0.72, g: fxSettings.eqHigh / 12 },
-    ],
-    [fxSettings.eqLow, fxSettings.eqMid, fxSettings.eqHigh],
-  );
+  // Close the device browser on an outside click or Escape.
+  useEffect(() => {
+    if (!browserAnchor) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (browserRef.current?.contains(t) || addSlotRef.current?.contains(t)) return;
+      setBrowserAnchor(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setBrowserAnchor(null);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [browserAnchor]);
 
-  const setEQ = useCallback(
-    (bands: EQBand[]) => {
-      if (bands.length < 3) return;
-      setFxSettings({
-        eqLow: Math.max(-12, Math.min(12, bands[0].g * 12)),
-        eqMid: Math.max(-12, Math.min(12, bands[1].g * 12)),
-        eqHigh: Math.max(-12, Math.min(12, bands[2].g * 12)),
-      });
-    },
-    [setFxSettings],
-  );
+  const chain = trackDevices[selectedTrackId] ?? [];
+
+  const setEqBand = useSessionStore((s) => s.setEqBand);
 
   const grWidth = fxEnabled && fxSettings.compressorEnabled && fxSettings.compression > 0
     ? Math.min(40, Math.round((fxSettings.compression / 100) * 40))
     : 0;
 
-  return (
-    <section className="studio-card" aria-label="Vocal FX Rack">
-      <div className="studio-card-head">
-        <span className="studio-card-head-ic" aria-hidden="true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M6 3v6M6 15v6M12 3v9M12 18v3M18 3v3M18 12v9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-            <circle cx="6" cy="12" r="2.2" stroke="currentColor" strokeWidth="1.9" />
-            <circle cx="12" cy="15" r="2.2" stroke="currentColor" strokeWidth="1.9" />
-            <circle cx="18" cy="9" r="2.2" stroke="currentColor" strokeWidth="1.9" />
-          </svg>
-        </span>
-        <h2 className="studio-card-head-title">Vocal FX Rack</h2>
-        <span className="studio-tag">Sensimilliea</span>
-        <div className="studio-head-spacer" />
-        <Switch
-          checked={fxEnabled}
-          onChange={setFxEnabled}
-          label="Enable Effects"
-        />
-      </div>
+  const renderDevice = (device: DeviceId, uid: string) => {
+    if (isNoteFxDevice(device)) return <NoteFxPanel type={device as NoteFxType} uid={uid} />;
+    switch (device) {
+      case 'autotune':
+        return (
+          <>
+            <div className="studio-mini-selects">
+              <MiniSelect
+                value={fxSettings.autotuneKey}
+                onChange={(k) => setFxSettings({ autotuneKey: k })}
+                options={KEYS}
+              />
+              <MiniSelect
+                value={fxSettings.autotuneScale}
+                onChange={(s) => setFxSettings({ autotuneScale: s })}
+                options={SCALES}
+              />
+            </div>
+            <div className="studio-knob-row">
+              <div className="studio-knob-unit">
+                <Knob
+                  value={fxSettings.autotuneSpeed}
+                  min={0}
+                  max={100}
+                  unit="ms"
+                  onChange={(v) => setFxSettings({ autotuneSpeed: v })}
+                  aria-label="Return"
+                />
+                <span className="studio-knob-name">Return</span>
+                <span className="studio-knob-value">{fxSettings.autotuneSpeed} ms</span>
+              </div>
+              <div className="studio-knob-unit">
+                <Knob
+                  value={fxSettings.pitchShiftSemitones}
+                  min={-12}
+                  max={12}
+                  step={1}
+                  onChange={(v) => setFxSettings({ pitchShiftSemitones: v })}
+                  aria-label="Pitch"
+                />
+                <span className="studio-knob-name">Pitch</span>
+                <span className="studio-knob-value">{fxSettings.pitchShiftSemitones} st</span>
+              </div>
+              <div className="studio-knob-unit">
+                <Knob
+                  value={fxSettings.formantShift}
+                  min={-12}
+                  max={12}
+                  step={1}
+                  onChange={(v) => setFxSettings({ formantShift: v })}
+                  aria-label="Formant"
+                />
+                <span className="studio-knob-name">Formant</span>
+                <span className="studio-knob-value">{fxSettings.formantShift} st</span>
+              </div>
+            </div>
+          </>
+        );
 
-      <div className="studio-fx-grid" data-disabled={String(!fxEnabled)}>
-        {/* T-Pain & Doubler */}
-        <div
-          className="studio-fx-module"
-          data-off={String(!fxSettings.autotuneEnabled && !fxSettings.doubleEnabled)}
-        >
-          <div className="studio-fx-head">
-            <span className="studio-fx-head-dot" />
-            <span className="studio-fx-head-name">T-Pain &amp; Doubler</span>
-            <Switch
-              compact
-              checked={fxSettings.autotuneEnabled}
-              onChange={(v) => setFxSettings({ autotuneEnabled: v })}
-              label="Tune"
-            />
-            <Switch
-              compact
-              checked={fxSettings.doubleEnabled}
-              onChange={(v) => setFxSettings({ doubleEnabled: v })}
-              label="Doub"
-            />
-          </div>
-          <div className="studio-mini-selects">
-            <MiniSelect
-              value={fxSettings.autotuneKey}
-              onChange={(k) => setFxSettings({ autotuneKey: k })}
-              options={KEYS}
-            />
-            <MiniSelect
-              value={fxSettings.autotuneScale}
-              onChange={(s) => setFxSettings({ autotuneScale: s })}
-              options={SCALES}
-            />
-          </div>
+      case 'doubler':
+        return (
           <div className="studio-knob-row">
-            <div className="studio-knob-unit">
-              <Knob
-                value={fxSettings.autotuneSpeed}
-                min={0}
-                max={100}
-                unit="ms"
-                onChange={(v) => setFxSettings({ autotuneSpeed: v })}
-                aria-label="Return"
-              />
-              <span className="studio-knob-name">Return</span>
-              <span className="studio-knob-value">{fxSettings.autotuneSpeed} ms</span>
-            </div>
-            <div className="studio-knob-unit">
-              <Knob
-                value={fxSettings.pitchShiftSemitones}
-                min={-12}
-                max={12}
-                step={1}
-                onChange={(v) => setFxSettings({ pitchShiftSemitones: v })}
-                aria-label="Pitch"
-              />
-              <span className="studio-knob-name">Pitch</span>
-              <span className="studio-knob-value">{fxSettings.pitchShiftSemitones} st</span>
-            </div>
-            <div className="studio-knob-unit">
-              <Knob
-                value={fxSettings.formantShift}
-                min={-12}
-                max={12}
-                step={1}
-                onChange={(v) => setFxSettings({ formantShift: v })}
-                aria-label="Formant"
-              />
-              <span className="studio-knob-name">Formant</span>
-              <span className="studio-knob-value">{fxSettings.formantShift} st</span>
-            </div>
             <div className="studio-knob-unit">
               <Knob
                 value={fxSettings.doubleWidth}
@@ -202,99 +270,46 @@ export function FXRack() {
               <span className="studio-knob-value">{fxSettings.doubleWidth}%</span>
             </div>
           </div>
-        </div>
+        );
 
-        {/* Dynamics */}
-        <div className="studio-fx-module" data-off={String(!fxSettings.compressorEnabled)}>
-          <div className="studio-fx-head">
-            <span className="studio-fx-head-dot" />
-            <span className="studio-fx-head-name">Dynamics</span>
-            <Switch
-              compact
-              checked={fxSettings.compressorEnabled}
-              onChange={(v) => setFxSettings({ compressorEnabled: v })}
-              label="Comp"
-            />
-          </div>
-          <div className="studio-knob-row">
-            <div className="studio-knob-unit">
-              <Knob
-                value={fxSettings.compression}
-                min={-60}
-                max={0}
-                unit=" dB"
-                onChange={(v) => setFxSettings({ compression: v })}
-                aria-label="Thresh"
-              />
-              <span className="studio-knob-name">Thresh</span>
-              <span className="studio-knob-value">{fxSettings.compression} dB</span>
+      case 'compressor':
+        return (
+          <>
+            <div className="studio-knob-row">
+              <div className="studio-knob-unit">
+                <Knob
+                  value={fxSettings.compression}
+                  min={-60}
+                  max={0}
+                  step={1}
+                  unit=" dB"
+                  onChange={(v) => setFxSettings({ compression: v })}
+                  aria-label="Thresh"
+                />
+                <span className="studio-knob-name">Thresh</span>
+                <span className="studio-knob-value">{Math.round(fxSettings.compression)} dB</span>
+              </div>
             </div>
-            <div className="studio-knob-unit">
-              <Knob
-                value={3}
-                min={1}
-                max={20}
-                step={1}
-                unit=":1"
-                onChange={() => {
-                  /* Ratio is a static mockup control for this skin pass;
-                     the existing recorder FX graph does not currently expose a
-                     runtime compressor ratio from fxSettings. */
-                }}
-                aria-label="Ratio"
-              />
-              <span className="studio-knob-name">Ratio</span>
-              <span className="studio-knob-value">3:1</span>
+            <div className="studio-gr-meter">
+              <span className="studio-gr-label">Gain Reduction</span>
+              <div className="studio-gr-bar">
+                <span data-meter-fill style={{ width: `${grWidth}%` }} />
+              </div>
             </div>
-          </div>
-          <div className="studio-gr-meter">
-            <span className="studio-gr-label">Gain Reduction</span>
-            <div className="studio-gr-bar">
-              <span data-meter-fill style={{ width: `${grWidth}%` }} />
-            </div>
-          </div>
-        </div>
+          </>
+        );
 
-        {/* Parametric EQ */}
-        <div className="studio-fx-module" data-off={String(!fxSettings.eqEnabled)}>
-          <div className="studio-fx-head">
-            <span className="studio-fx-head-dot" />
-            <span className="studio-fx-head-name">Parametric EQ</span>
-            <Switch
-              compact
-              checked={fxSettings.eqEnabled}
-              onChange={(v) => setFxSettings({ eqEnabled: v })}
-              label="EQ"
-            />
-          </div>
+      case 'eq':
+        return (
           <ParametricEQ
-            bands={eqBands}
+            bands={fxSettings.eqBands}
             enabled={fxEnabled && fxSettings.eqEnabled}
-            onChange={setEQ}
+            onChange={setEqBand}
           />
-        </div>
+        );
 
-        {/* Space & Echo */}
-        <div
-          className="studio-fx-module"
-          data-off={String(!fxSettings.delayEnabled && !fxSettings.reverbEnabled)}
-        >
-          <div className="studio-fx-head">
-            <span className="studio-fx-head-dot" />
-            <span className="studio-fx-head-name">Space &amp; Echo</span>
-            <Switch
-              compact
-              checked={fxSettings.delayEnabled}
-              onChange={(v) => setFxSettings({ delayEnabled: v })}
-              label="Delay"
-            />
-            <Switch
-              compact
-              checked={fxSettings.reverbEnabled}
-              onChange={(v) => setFxSettings({ reverbEnabled: v })}
-              label="Verb"
-            />
-          </div>
+      case 'delay':
+        return (
           <div className="studio-knob-row">
             <div className="studio-knob-unit">
               <Knob
@@ -322,6 +337,18 @@ export function FXRack() {
               <span className="studio-knob-name">Delay</span>
               <span className="studio-knob-value">{fxSettings.delayTime.toFixed(2)} s</span>
             </div>
+          </div>
+        );
+
+      case 'synth':
+        return <SynthPanel laneId={selectedTrackId} />;
+
+      case 'drums':
+        return <DrumPanel laneId={selectedTrackId} />;
+
+      case 'reverb':
+        return (
+          <div className="studio-knob-row">
             <div className="studio-knob-unit">
               <Knob
                 value={fxSettings.reverbDecay}
@@ -347,8 +374,218 @@ export function FXRack() {
               <span className="studio-knob-value">{fxSettings.reverbWet}%</span>
             </div>
           </div>
-        </div>
+        );
+    }
+  };
+
+  const flagFor: Record<DeviceId, boolean> = {
+    autotune: fxSettings.autotuneEnabled,
+    doubler: fxSettings.doubleEnabled,
+    compressor: fxSettings.compressorEnabled,
+    eq: fxSettings.eqEnabled,
+    delay: fxSettings.delayEnabled,
+    reverb: fxSettings.reverbEnabled,
+    synth: true,
+    drums: true,
+    arp: true,
+    chord: true,
+    transpose: true,
+    noteFilter: true,
+    echo: true,
+    scale: true,
+    randomize: true,
+  };
+  const setFlag = (device: DeviceId, on: boolean) => {
+    const key = {
+      autotune: 'autotuneEnabled',
+      doubler: 'doubleEnabled',
+      compressor: 'compressorEnabled',
+      eq: 'eqEnabled',
+      delay: 'delayEnabled',
+      reverb: 'reverbEnabled',
+    } as const;
+    if (isInstrumentDevice(device) || isNoteFxDevice(device)) return;
+    setFxSettings({ [key[device as keyof typeof key]]: on });
+  };
+
+  return (
+    <section
+      className="studio-card"
+      aria-label="Devices"
+      onContextMenu={(e) => {
+        // The chain strip has already claimed the event where it is; this covers the rest of the rack.
+        if (e.defaultPrevented) return;
+        openMenu(e, addDeviceItems());
+      }}
+    >
+      <div className="studio-card-head">
+        <span className="studio-card-head-ic" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M6 3v6M6 15v6M12 3v9M12 18v3M18 3v3M18 12v9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+            <circle cx="6" cy="12" r="2.2" stroke="currentColor" strokeWidth="1.9" />
+            <circle cx="12" cy="15" r="2.2" stroke="currentColor" strokeWidth="1.9" />
+            <circle cx="18" cy="9" r="2.2" stroke="currentColor" strokeWidth="1.9" />
+          </svg>
+        </span>
+        <h2 className="studio-card-head-title">Devices</h2>
+        <span className="studio-tag">{trackName(selectedTrackId, extraTracks.find((t) => t.id === selectedTrackId)?.name)}</span>
+        <div className="studio-head-spacer" />
+        <Switch checked={fxEnabled} onChange={setFxEnabled} label="Enable Effects" />
       </div>
+
+      <div
+        ref={stripRef}
+        className="studio-fx-grid"
+        data-disabled={String(!fxEnabled && !chain.some((d) => isInstrumentDevice(d.type)))}
+        onContextMenu={(e) => openMenu(e, addDeviceItems())}
+      >
+          {chain.map((instance, index) => {
+            const device = instance.type;
+            // Numbers copies of the same device: "Delay", "Delay 2", ...
+            const copyNumber = chain.slice(0, index + 1).filter((d) => d.type === device).length;
+            const copyCount = chain.filter((d) => d.type === device).length;
+            // Where a dragged device would land, shown as a bar on the module.
+            const dropBefore = reorder !== null && reorder.over === index && reorder.from !== index;
+            const dropAfter =
+              reorder !== null && reorder.over === chain.length && index === chain.length - 1;
+            const stage = deviceStage(device);
+            const startsStage = index === 0 || deviceStage(chain[index - 1].type) !== stage;
+            return (
+            <Fragment key={instance.uid}>
+            {startsStage && <StageLabel stage={stage} />}
+            <div
+              className="studio-fx-module"
+              data-device-index={index}
+              data-off={String(isNoteFxDevice(device) ? (midiFxParams[instance.uid]?.on ?? 1) === 0 : !isInstrumentDevice(device) && !flagFor[device])}
+              data-stage={deviceStage(device)}
+              data-instrument={String(isInstrumentDevice(device))}
+              onContextMenu={(e) => {
+                e.stopPropagation();
+                openMenu(e, [
+                  { label: 'Duplicate', onSelect: () => addDevice(selectedTrackId, device) },
+                  { label: 'Remove', danger: true, onSelect: () => removeDevice(selectedTrackId, instance.uid) },
+                  { kind: 'separator' },
+                  ...addDeviceItems(),
+                ]);
+              }}
+              data-dragging={String(reorder?.from === index)}
+              data-drop={dropBefore ? 'before' : dropAfter ? 'after' : undefined}
+            >
+              <div className="studio-fx-head">
+                <span
+                  className="studio-fx-grip"
+                  title="Drag to reorder"
+                  aria-label={`Drag to reorder ${DEVICE_NAMES[device]}`}
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    setReorder({ from: index, over: index });
+                  }}
+                  onPointerMove={(e) => {
+                    if (!reorder || !stripRef.current) return;
+                    // Insertion point = how many module centres sit left of the pointer.
+                    const mods = Array.from(stripRef.current.querySelectorAll<HTMLElement>('[data-device-index]'));
+                    const over = mods.filter((m) => {
+                      const r = m.getBoundingClientRect();
+                      return e.clientX > r.left + r.width / 2;
+                    }).length;
+                    if (over !== reorder.over) setReorder({ ...reorder, over });
+                  }}
+                  onPointerUp={() => {
+                    if (!reorder) return;
+                    // Removing the dragged device first shifts later positions left by one.
+                    const to = reorder.over > reorder.from ? reorder.over - 1 : reorder.over;
+                    reorderDevice(selectedTrackId, reorder.from, to);
+                    setReorder(null);
+                  }}
+                  onPointerCancel={() => setReorder(null)}
+                >
+                  ⋮⋮
+                </span>
+                <span className="studio-fx-head-dot" />
+                <span className="studio-fx-head-name">
+                  {DEVICE_NAMES[device]}
+                  {copyCount > 1 ? ` ${copyNumber}` : ''}
+                </span>
+                {isNoteFxDevice(device) ? (
+                  <Switch
+                    compact
+                    checked={(midiFxParams[instance.uid]?.on ?? NOTE_FX_DEFAULTS[device as NoteFxType].on) !== 0}
+                    onChange={(v) => setMidiFxParam(instance.uid, { on: v ? 1 : 0 })}
+                    label={DEVICE_SWITCH_LABEL[device]}
+                  />
+                ) : !isInstrumentDevice(device) && (
+                  <Switch
+                    compact
+                    checked={flagFor[device]}
+                    onChange={(v) => setFlag(device, v)}
+                    label={DEVICE_SWITCH_LABEL[device]}
+                  />
+                )}
+                <button
+                  className="studio-mini-btn"
+                  type="button"
+                  onClick={() => removeDevice(selectedTrackId, instance.uid)}
+                  aria-label={`Remove ${DEVICE_NAMES[device]}`}
+                  title="Remove device"
+                >
+                  ×
+                </button>
+              </div>
+              {renderDevice(device, instance.uid)}
+            </div>
+            </Fragment>
+            );
+          })}
+
+        {chain.length === 0 && (
+          <div className="studio-fx-empty-chain">No devices on this track yet.</div>
+        )}
+        <div className="studio-fx-add-slot">
+          <button
+            ref={addSlotRef}
+            className="studio-fx-add-btn"
+            type="button"
+            aria-expanded={browserAnchor !== null}
+            onClick={() => {
+              if (browserAnchor) {
+                setBrowserAnchor(null);
+                return;
+              }
+              const r = addSlotRef.current?.getBoundingClientRect();
+              if (r) setBrowserAnchor({ left: r.left, bottom: window.innerHeight - r.top + 8 });
+            }}
+          >
+            <span aria-hidden="true">+</span> Add device
+          </button>
+        </div>
+        </div>
+
+      {browserAnchor && createPortal(
+        <div
+          ref={browserRef}
+          className="studio-device-browser"
+          role="dialog"
+          aria-label="Device browser"
+          style={{ left: browserAnchor.left, bottom: browserAnchor.bottom }}
+        >
+          <div className="studio-device-browser-head">
+            Device browser <span>click to add, as many as you like</span>
+          </div>
+          {ALL_DEVICES.map((d) => (
+            <button
+              key={d}
+              className="studio-device-item"
+              type="button"
+              onClick={() => addDevice(selectedTrackId, d)}
+            >
+              {DEVICE_NAMES[d]}
+              <span>{DEVICE_INFO[d]}</span>
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
     </section>
   );
 }

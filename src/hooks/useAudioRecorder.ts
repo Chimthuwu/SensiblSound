@@ -4,9 +4,14 @@ import { backupService } from '../services/backupService';
 
 export function useAudioRecorder() {
   const { isRecording, setIsRecording, setActiveTake, setIsPlaying, backingTrack, isMonitoring, fxEnabled, fxSettings } = useSessionStore();
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [isReady, setIsReady] = useState(false);
+  // Device list, selection and readiness live in the store so any component
+  // (e.g. the arrangement's mic picker) can read and change them.
+  const devices = useSessionStore((s) => s.micDevices);
+  const selectedDeviceId = useSessionStore((s) => s.selectedMicId);
+  const setSelectedDeviceId = useSessionStore((s) => s.setSelectedMicId);
+  const setMicDevices = useSessionStore((s) => s.setMicDevices);
+  const setMicReady = useSessionStore((s) => s.setMicReady);
+  const isReady = useSessionStore((s) => s.micReady);
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   const mediaRecorder = useRef<MediaRecorder | null>(null);
@@ -30,14 +35,14 @@ export function useAudioRecorder() {
 
         const devs = await navigator.mediaDevices.enumerateDevices();
         const audioInputs = devs.filter(d => d.kind === 'audioinput');
-        setDevices(audioInputs);
+        setMicDevices(audioInputs);
         if (audioInputs.length > 0) {
           setSelectedDeviceId(audioInputs[0].deviceId);
         }
-        setIsReady(true);
+        setMicReady(true);
       } catch (err) {
         console.error("Microphone access denied or error:", err);
-        setIsReady(false);
+        setMicReady(false);
       }
     }
     getDevices();
@@ -92,9 +97,7 @@ export function useAudioRecorder() {
     // All nodes default to null. We only assign a node when its FX toggle is on,
     // and the cleanup function below safely no-ops on null references.
     let compressor: DynamicsCompressorNode | null = null;
-    let lowShelf: BiquadFilterNode | null = null;
-    let midPeaking: BiquadFilterNode | null = null;
-    let highShelf: BiquadFilterNode | null = null;
+    let eqFilters: BiquadFilterNode[] = [];
     let waveshaper: WaveShaperNode | null = null;
 
     let pitchShifter: DelayNode | null = null;
@@ -222,28 +225,20 @@ export function useAudioRecorder() {
           prev = compressor;
         }
 
-        // 2. Parametric EQ (Low, Mid, High) — gated by eqEnabled
+        // 2. Parametric EQ — one biquad per band, in order. Gated by eqEnabled.
         if (fxSettings.eqEnabled) {
-          lowShelf = audioCtx.createBiquadFilter();
-          lowShelf.type = 'lowshelf';
-          lowShelf.frequency.value = 150;
-          lowShelf.gain.value = fxSettings.eqLow;
-
-          midPeaking = audioCtx.createBiquadFilter();
-          midPeaking.type = 'peaking';
-          midPeaking.frequency.value = 1200;
-          midPeaking.Q.value = 1.2;
-          midPeaking.gain.value = fxSettings.eqMid;
-
-          highShelf = audioCtx.createBiquadFilter();
-          highShelf.type = 'highshelf';
-          highShelf.frequency.value = 4000;
-          highShelf.gain.value = fxSettings.eqHigh;
-
-          prev.connect(lowShelf);
-          lowShelf.connect(midPeaking);
-          midPeaking.connect(highShelf);
-          prev = highShelf;
+          eqFilters = fxSettings.eqBands.map((band) => {
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = band.type === 'peak' ? 'peaking' : band.type;
+            filter.frequency.value = band.freq;
+            filter.gain.value = band.gain;
+            filter.Q.value = band.q;
+            return filter;
+          });
+          for (const filter of eqFilters) {
+            prev.connect(filter);
+            prev = filter;
+          }
         }
 
         // 3. Autotune (saturation + pitch-shift) — gated by autotuneEnabled
@@ -444,9 +439,7 @@ export function useAudioRecorder() {
       if (source) source.disconnect();
       if (inputGainNode) inputGainNode.disconnect();
       if (compressor) compressor.disconnect();
-      if (lowShelf) lowShelf.disconnect();
-      if (midPeaking) midPeaking.disconnect();
-      if (highShelf) highShelf.disconnect();
+      for (const filter of eqFilters) filter.disconnect();
       if (waveshaper) waveshaper.disconnect();
       if (pitchShifter) pitchShifter.disconnect();
       if (analyser) analyser.disconnect();
@@ -470,6 +463,9 @@ export function useAudioRecorder() {
   // Handle Recording State Changes
   useEffect(() => {
     if (isRecording) {
+      // An armed instrument track records played notes (see midi/midiInput.ts), not the microphone.
+      const st = useSessionStore.getState();
+      if ((st.trackDevices[st.armedTrackId] ?? []).some((d) => d.type === 'synth' || d.type === 'drums')) return;
       startRecording();
     } else {
       stopRecording();
@@ -521,7 +517,15 @@ export function useAudioRecorder() {
 
         const url = URL.createObjectURL(finalBlob);
         const id = crypto.randomUUID();
-        setActiveTake({ id, url, blob: finalBlob, timestamp: Date.now(), transportStartMs, mimeType: finalMimeType });
+        // Route the take to whichever track is armed. Tracks 1 and 2 keep their own slots.
+        const { armedTrackId, setBackingTrack, setTrackClip } = useSessionStore.getState();
+        if (armedTrackId === 'backing') {
+          setBackingTrack({ id, name: `Recording ${new Date().toLocaleTimeString()}`, url, blob: finalBlob, startMs: 0 });
+        } else if (armedTrackId === 'active_take' || !armedTrackId) {
+          setActiveTake({ id, url, blob: finalBlob, timestamp: Date.now(), transportStartMs, mimeType: finalMimeType });
+        } else {
+          setTrackClip(armedTrackId, { name: `Recording ${new Date().toLocaleTimeString()}`, url, blob: finalBlob });
+        }
 
         // Trigger Backup Process — local (IndexedDB), cloud (Firebase
         // Storage) and Google Drive are independent, all real, and reported

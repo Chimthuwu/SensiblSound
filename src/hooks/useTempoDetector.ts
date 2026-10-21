@@ -8,7 +8,7 @@ export function useTempoDetector() {
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
-    if (backingTrack && backingTrack.id !== 'default-backing-track') {
+    if (backingTrack && backingTrack.id !== 'default-backing-track' && !useSessionStore.getState().autoWarp) {
       // Simulate Tempo Detection
       setIsDetecting(true);
       setShowPrompt(false);

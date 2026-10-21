@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { useSessionStore } from '../stores/useSessionStore';
+import { createMeterTap, masterIn, playbackContext } from '../utils/audioBus';
 
 export interface AudioPlayerOptions {
   /** Project-time offset (in ms) at which this element should start being audible. */
@@ -11,6 +12,12 @@ export interface AudioPlayerOptions {
   blob?: Blob;
   /** Force mute state, ignoring local isMuted. Used for global solo/mute functionality */
   forceMute?: boolean;
+  /** Track volume, 0..1. Overrides the hook's local volume when set. */
+  volume?: number;
+  /** Stereo pan, -1 (left) to 1 (right). Default 0. */
+  pan?: number;
+  /** Lane this player belongs to; its level meter in the mixer reads from here. */
+  meterId?: string;
 }
 
 export function useAudioPlayer(
@@ -28,6 +35,33 @@ export function useAudioPlayer(
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  // The media element routed through a stereo panner, once per element.
+  const panRef = useRef<{ el: HTMLMediaElement; panner: StereoPannerNode; untap?: () => void } | null>(null);
+  useEffect(() => () => panRef.current?.untap?.(), []);
+
+  // Route the element through a pan node. The element's volume still comes from WaveSurfer.
+  useEffect(() => {
+    const ws = wavesurfer.current;
+    if (!ws || !isReady) return;
+    const el = ws.getMediaElement();
+    if (!el) return;
+    if (!panRef.current || panRef.current.el !== el) {
+      try {
+        const ctx = playbackContext();
+        const source = ctx.createMediaElementSource(el);
+        const panner = ctx.createStereoPanner();
+        source.connect(panner);
+        panner.connect(masterIn());
+        const untap = options?.meterId ? createMeterTap(ctx, panner, options.meterId) : undefined;
+        panRef.current?.untap?.();
+        panRef.current = { el, panner, untap };
+      } catch (err) {
+        console.warn('Pan unavailable for this track', err);
+        return;
+      }
+    }
+    panRef.current.panner.pan.value = options?.pan ?? 0;
+  }, [isReady, url, options?.pan]);
 
   const interactive = options?.interactive ?? true;
 
@@ -128,8 +162,8 @@ export function useAudioPlayer(
   useEffect(() => {
     if (!wavesurfer.current) return;
     const effectivelyMuted = options?.forceMute || isMuted;
-    wavesurfer.current.setVolume(effectivelyMuted ? 0 : volume);
-  }, [volume, isMuted, options?.forceMute]);
+    wavesurfer.current.setVolume(effectivelyMuted ? 0 : (options?.volume ?? volume));
+  }, [volume, isMuted, options?.forceMute, options?.volume]);
 
   // THE main sync effect: offset-aware seeking + play/pause windowing.
   //

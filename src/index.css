@@ -2,10 +2,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #a855f7; /* neon purple accent */
-  --color-background: #0a0a0b; /* pitch black */
-  --color-surface: #121214; /* slightly lighter dark grey */
-  --color-surface-hover: #1c1c1f;
+  --color-primary: #a64dff; /* neon purple accent */
+  --color-background: #0b0910; /* pitch black */
+  --color-surface: #16121d; /* slightly lighter dark grey */
+  --color-surface-hover: #241e30;
   --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -13,6 +13,9 @@
 @layer base {
   body {
     background-color: var(--color-background);
+    /* Soft violet glow at the top, as in the studio mockup. */
+    background-image: radial-gradient(1200px 600px at 50% -10%, rgba(138, 43, 226, 0.13), transparent 65%);
+    background-attachment: fixed;
     color: #e4e4e7;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
@@ -202,6 +205,28 @@
   white-space: nowrap;
 }
 .studio-ghost-btn:hover { border-color: theme("colors.primary"); color: #fff; background: rgba(168, 85, 247, 0.12); }
+.studio-ghost-btn:disabled, .studio-hero-btn:disabled, .studio-exp-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.studio-track-head-controls { flex-wrap: wrap; row-gap: 6px; }
+.studio-track-head-controls input[type=range] { flex-basis: 100%; }
+/* Volume and pan share a row: volume takes the room, pan is a short slider. */
+.studio-track-head-controls input.studio-vol { flex: 1 1 0; min-width: 0; }
+.studio-track-head-controls input.studio-pan { flex: 0 0 56px; }
+/* Monitor and the mic picker share one row so the lane header still fits its height. */
+.studio-track-head-controls .studio-mini-btn { flex: none; }
+.studio-track-head-controls select.studio-mini-btn { flex: 1 1 0; min-width: 0; text-overflow: ellipsis; }
+.studio-mini-btn {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  color: #c9c0d8;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+}
+.studio-mini-btn:hover { border-color: theme("colors.primary"); color: #fff; }
+.studio-mini-btn[data-on="true"] { border-color: theme("colors.primary"); color: #e9d5ff; background: rgba(168, 85, 247, 0.18); }
+.studio-lane-hint { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 11px; color: #5f5870; pointer-events: none; }
+.studio-lane[data-muted="true"] .studio-clip { opacity: 0.35; }
 
 .studio-hero-btn {
   display: flex;
@@ -273,7 +298,9 @@
 }
 
 .studio-track-head {
-  height: 96px;
+  position: relative;
+  overflow: hidden;
+  height: 118px;
   border-bottom: 1px solid theme("colors.zinc-600");
   display: flex;
   position: relative;
@@ -452,7 +479,7 @@
 .studio-lanes { position: relative; }
 
 .studio-lane {
-  height: 96px;
+  height: 118px;
   border-bottom: 1px solid theme("colors.zinc-600");
   position: relative;
   background-color: #17141d;
@@ -523,14 +550,194 @@
 }
 
 /* FX rack */
+/* Devices sit in a horizontal chain, like Ableton's device view. */
 .studio-fx-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
-  gap: 1px;
-  background: theme("colors.zinc-600");
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  background: #2b2438;
   transition: opacity 0.2s, filter 0.2s;
 }
-.studio-fx-grid[data-disabled="true"] { opacity: 0.32; filter: grayscale(0.75); pointer-events: none; }
+.studio-fx-grid::-webkit-scrollbar { height: 8px; }
+.studio-fx-grid::-webkit-scrollbar-thumb { background: #4a4560; border-radius: 4px; }
+.studio-fx-grid .studio-fx-module { flex: 0 0 248px; border-right: 2px solid #2b2438; }
+.studio-fx-grid .studio-fx-module[data-dragging="true"] { opacity: 0.45; }
+.studio-fx-grid .studio-fx-module[data-drop="before"] { box-shadow: inset 4px 0 0 theme("colors.primary"); }
+.studio-fx-grid .studio-fx-module[data-drop="after"] { box-shadow: inset -4px 0 0 theme("colors.primary"); }
+.studio-fx-grip {
+  cursor: grab;
+  color: #6f6886;
+  font-size: 12px;
+  letter-spacing: -1px;
+  padding: 0 2px;
+  user-select: none;
+  touch-action: none;
+}
+.studio-fx-grip:active { cursor: grabbing; color: #c9c0d8; }
+.studio-fx-empty-chain { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #8b8299; }
+/* Track list extras: "+ Track" button and the drop zone under the arrangement. */
+.studio-add-track {
+  height: 30px;
+  width: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  color: #c9c0d8;
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.studio-add-track:hover { color: #fff; background: rgba(168, 85, 247, 0.14); }
+.studio-add-spacer { height: 30px; background: #151317; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.studio-drop-zone {
+  flex: 1 1 auto;
+  min-height: 90px;
+  margin: 10px 14px 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #8b8299;
+  transition: background 0.15s, border-color 0.15s;
+}
+.studio-drop-zone[data-hover="true"] { border-color: theme("colors.primary"); background: rgba(168, 85, 247, 0.12); color: #fff; }
+/* Effects switched off dims the devices, not the add slot, so you can still add devices. */
+.studio-fx-grid[data-disabled="true"] .studio-fx-module:not([data-instrument="true"]) { opacity: 0.32; filter: grayscale(0.75); pointer-events: none; }
+.studio-fx-add-slot { flex: 0 0 170px; display: flex; align-items: center; justify-content: center; padding: 14px; }
+.studio-fx-add-btn {
+  width: 100%;
+  height: 46px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9c0d8;
+  background: transparent;
+}
+.studio-fx-add-btn:hover, .studio-fx-add-btn[aria-expanded="true"] { border-color: theme("colors.primary"); color: #fff; background: rgba(168, 85, 247, 0.12); }
+.studio-fx-empty-chain { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #8b8299; padding: 14px; }
+/* Device browser: a popout over the rack, opened by the add slot. */
+.studio-device-browser {
+  position: fixed;
+  z-index: 90;
+  width: 290px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 8px;
+  border-radius: 12px;
+  background: #16121d;
+  border: 1px solid #2b2438;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+.studio-device-browser-head { font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: #a99bc0; padding: 6px 8px 8px; }
+.studio-device-browser-head span { text-transform: none; letter-spacing: 0; color: #6f6886; margin-left: 6px; }
+.studio-device-item { display: block; width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: #e4e0ee; }
+.studio-device-item:hover { background: rgba(168, 85, 247, 0.16); }
+.studio-device-item span { display: block; font-size: 10.5px; font-weight: 400; color: #8b8299; margin-top: 2px; }
+/* Theme hue: the top bar slider sets --hue-shift and the whole app rotates. */
+#root { filter: hue-rotate(var(--hue-shift, 0deg)) saturate(var(--theme-sat, 1)) contrast(var(--theme-contrast, 1)); }
+.studio-hue { display: flex; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: #8b8299; }
+.studio-hue input[type=range] {
+  width: 110px;
+  background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+  height: 6px;
+}
+.studio-hue input[type=range]::-webkit-slider-thumb { background: #fff; border-color: #0b0910; }
+/* App right-click menu. */
+.studio-context-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 200px;
+  padding: 6px;
+  border-radius: 10px;
+  background: #1b1725;
+  border: 1px solid #3a3148;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  user-select: none;
+}
+.studio-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  text-align: left;
+  color: #e4e0ee;
+}
+.studio-context-item:hover:not(:disabled) { background: rgba(168, 85, 247, 0.18); }
+.studio-context-item:disabled { opacity: 0.35; cursor: default; }
+.studio-context-item[data-danger="true"] { color: #fca5a5; }
+.studio-context-check { width: 12px; color: #c4a2ff; font-size: 11px; }
+.studio-context-sep { height: 1px; margin: 5px 4px; background: #3a3148; }
+/* Arrangement takes the free height so the device rack sits just above the transport. */
+/* Main column and the sample browser sit side by side. */
+.studio-shell { display: flex; align-items: stretch; min-height: 100vh; }
+.studio-shell > .studio { flex: 1 1 auto; min-width: 0; }
+.studio-browser {
+  flex: 0 0 280px;
+  position: sticky;
+  top: 54px;
+  align-self: flex-start;
+  height: calc(100vh - 54px - 74px);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #2b2438;
+  background: #100d16;
+  padding-bottom: 74px;
+  box-sizing: content-box;
+}
+.studio-browser[data-collapsed="true"] { flex-basis: 36px; width: 36px; }
+.studio-browser-toggle {
+  position: absolute;
+  left: -12px;
+  top: 10px;
+  z-index: 5;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: #16121d;
+  border: 1px solid #2b2438;
+  color: #c9c0d8;
+  font-size: 15px;
+  line-height: 1;
+}
+.studio-browser-toggle:hover { border-color: theme("colors.primary"); color: #fff; }
+.studio-browser-vlabel {
+  writing-mode: vertical-rl;
+  margin: 48px auto 0;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8b8299;
+}
+.studio-browser-tabs { display: flex; border-bottom: 1px solid #2b2438; }
+.studio-browser-tab { flex: 1; padding: 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #8b8299; }
+.studio-browser-tab[aria-selected="true"] { color: #fff; box-shadow: inset 0 -2px 0 theme("colors.primary"); }
+.studio-browser-tab:disabled { opacity: 0.4; }
+.studio-browser-tools { display: flex; gap: 6px; padding: 8px; align-items: center; }
+.studio-browser-search { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 8px; background: #16121d; border: 1px solid #2b2438; font-size: 12px; color: #e4e0ee; }
+.studio-browser-list { flex: 1 1 auto; overflow-y: auto; padding: 0 6px 8px; }
+.studio-browser-group { margin-bottom: 8px; }
+.studio-browser-cat { font-size: 9.5px; letter-spacing: 1.4px; text-transform: uppercase; color: #6f6886; padding: 6px 4px 4px; }
+.studio-sample { display: flex; align-items: center; gap: 8px; padding: 6px 6px; border-radius: 8px; cursor: grab; font-size: 12px; color: #e4e0ee; }
+.studio-sample:hover { background: rgba(168, 85, 247, 0.12); }
+.studio-sample[data-playing="true"] { background: rgba(168, 85, 247, 0.2); }
+.studio-sample-play { width: 22px; height: 22px; border-radius: 6px; font-size: 9px; background: #1c1726; color: #c9c0d8; flex: 0 0 22px; }
+.studio-sample-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.studio-sample { flex-wrap: wrap; row-gap: 4px; }
+.studio-sample-wave { flex: 0 0 100%; height: 22px; position: relative; border-radius: 4px; overflow: hidden; background: #0e0b15; }
+.studio-sample-wave canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.studio-sample-dur { font-size: 10px; color: #6f6886; font-family: ui-monospace, Menlo, monospace; }
+.studio-browser-empty { padding: 14px; font-size: 12px; color: #8b8299; }
+.studio-browser-credit { padding: 8px; font-size: 10px; line-height: 1.4; color: #6f6886; border-top: 1px solid #2b2438; }
+.studio-browser-credit a { color: #a99bc0; text-decoration: underline; }
+.studio > .studio-card:first-child { flex: 1 1 0; min-height: 280px; display: flex; flex-direction: column; }
+.studio > .studio-card:last-child { flex: 0 0 auto; min-height: 250px; display: flex; flex-direction: column; }
+.studio > .studio-card:last-child > .studio-fx-grid { flex: 1 1 auto; }
+.studio-device-menu { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.studio-fx-empty { padding: 22px 16px; font-size: 12px; color: #5f5870; text-align: center; }
 
 .studio-fx-module {
   background: linear-gradient(180deg, #171320, #131020);
@@ -1104,3 +1311,127 @@
   0%   { opacity: 0; transform: translateY(15px); letter-spacing: 0.6em; filter: blur(5px); }
   100% { opacity: 1; transform: translateY(0); letter-spacing: 0.35em; filter: blur(0); }
 }
+
+/* Track header: record arm, and the Vol / Pan labels beside the sliders. */
+.studio-arm { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #5a3040; background: #1c1726; flex: none; margin-right: 2px; }
+.studio-arm:hover { border-color: #ef4444; }
+.studio-arm[data-armed="true"] { background: #ef4444; border-color: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.8); }
+.studio-slider-label { flex: none; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: #6f6886; }
+
+/* Editable tempo in the transport. */
+.studio-tempo-input { width: 58px; background: transparent; color: inherit; font: inherit; text-align: right; border: 0; border-bottom: 1px dashed #4a4560; padding: 0 2px; }
+.studio-tempo-input:focus { outline: none; border-bottom-color: theme("colors.primary"); }
+
+/* Input picker keeps to its track header; it no longer spills into the track below. */
+.studio-track-head-controls select.studio-mini-btn { height: 22px; max-width: 100%; }
+
+/* Disabled tracks are dimmed; drag a track header to reorder, with a marker where it will land. */
+.studio-track-head[data-disabled="true"], .studio-lane[data-disabled="true"] { opacity: 0.4; }
+.studio-track-head[data-drop="before"] { box-shadow: inset 0 3px 0 theme("colors.primary"); }
+.studio-track-head[data-dragging="true"] { opacity: 0.55; }
+.studio-track-head-name { cursor: grab; touch-action: none; }
+
+/* MIDI clips and the add-track row */
+.studio-midi-preview { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.studio-add-row { display: flex; gap: 6px; }
+.studio-add-row .studio-add-track { flex: 1; }
+.studio-drum-pads { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 10px 0; }
+
+/* MIDI editor: piano roll and drum steps */
+.studio-midi-editor { margin-top: 10px; }
+.studio-midi-warn { padding: 8px 12px; font-size: 12px; color: #fbbf24; background: rgba(251, 191, 36, 0.08); border-bottom: 1px solid rgba(251, 191, 36, 0.2); }
+.studio-roll-scroll { max-height: 280px; overflow: auto; background: #100e16; }
+.studio-roll { position: relative; }
+.studio-roll-row { display: flex; align-items: stretch; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+.studio-roll-row[data-black="true"] { background: rgba(255, 255, 255, 0.025); }
+.studio-roll-key { flex: 0 0 64px; width: 64px; padding: 0 6px; font-size: 9px; text-align: right; color: #a1a1aa; background: #1b1824; border: 0; border-right: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer; position: sticky; left: 0; z-index: 2; }
+.studio-roll-key[data-black="true"] { background: #131019; }
+.studio-roll-key:hover { color: #fff; }
+.studio-roll-cells { position: relative; display: flex; }
+.studio-roll-cell { flex: 0 0 auto; border-right: 1px solid rgba(255, 255, 255, 0.04); cursor: crosshair; }
+.studio-roll-cell[data-beat="true"] { border-left: 1px solid rgba(255, 255, 255, 0.1); }
+.studio-roll-cell[data-bar="true"] { border-left: 1px solid rgba(255, 255, 255, 0.28); }
+.studio-roll-cell:hover { background: rgba(168, 85, 247, 0.16); }
+.studio-roll-note { position: absolute; top: 1px; bottom: 1px; border-radius: 3px; background: linear-gradient(180deg, #c084fc, #7c3aed); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); cursor: pointer; z-index: 1; }
+.studio-roll-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; background: rgba(255, 255, 255, 0.25); border-radius: 0 3px 3px 0; }
+.studio-roll-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #f43f5e; pointer-events: none; z-index: 3; }
+
+/* Auto-warp button and prompt */
+.studio-warp-btn { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; color: #a1a1aa; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: color 0.15s, background 0.15s, border-color 0.15s; }
+.studio-warp-btn:hover { color: #fff; border-color: rgba(168, 85, 247, 0.5); }
+.studio-warp-btn[data-on="true"] { color: #fff; background: linear-gradient(180deg, rgba(168, 85, 247, 0.42), rgba(124, 58, 237, 0.3)); border-color: rgba(192, 132, 252, 0.7); box-shadow: 0 0 14px rgba(168, 85, 247, 0.35); }
+.studio-warp-btn[data-busy="true"] svg { animation: warp-pulse 0.9s ease-in-out infinite; }
+@keyframes warp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.studio-toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 60; padding: 9px 16px; border-radius: 10px; font-size: 12.5px; color: #fff; background: rgba(24, 20, 34, 0.96); border: 1px solid rgba(168, 85, 247, 0.5); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); }
+
+/* MIDI controller pill */
+.studio-midi-pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: 999px; font-size: 11px; color: #a1a1aa; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); }
+button.studio-midi-pill { cursor: pointer; }
+button.studio-midi-pill:hover { color: #fff; border-color: rgba(168, 85, 247, 0.5); }
+.studio-midi-pill[data-state="ok"] { color: #d4d4d8; border-color: rgba(52, 211, 153, 0.4); }
+.studio-midi-pill[data-state="ok"] .studio-status-dot { background: #34d399; }
+.studio-midi-pill[data-lit="true"] .studio-status-dot { box-shadow: 0 0 10px 3px #34d399; background: #6ee7b7; }
+.studio-midi-pill select { background: transparent; color: inherit; border: 0; font-size: 11px; max-width: 150px; outline: none; }
+.studio-midi-pill select option { color: #000; }
+
+/* Theme button and its dropdown */
+.studio-theme { position: relative; }
+.studio-theme-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; color: #a1a1aa; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; }
+.studio-theme-btn:hover, .studio-theme-btn[aria-expanded="true"] { color: #fff; border-color: rgba(168, 85, 247, 0.5); }
+.studio-theme-btn[data-changed="true"] svg { color: #c084fc; }
+.studio-theme-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 70; width: 260px; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: rgba(22, 18, 31, 0.98); border: 1px solid rgba(168, 85, 247, 0.35); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55); }
+.studio-theme-row { display: grid; grid-template-columns: 74px 1fr 42px; align-items: center; gap: 8px; font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: #8b8299; }
+.studio-theme-row output { text-align: right; color: #d4d4d8; font-variant-numeric: tabular-nums; }
+.studio-theme-row input[type=range] { width: 100%; }
+.studio-theme-row[data-kind="hue"] input[type=range] { background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000); height: 6px; }
+.studio-theme-row[data-kind="saturation"] input[type=range] { background: linear-gradient(90deg, #6b6675, #a855f7); height: 6px; }
+.studio-theme-row[data-kind="contrast"] input[type=range] { background: linear-gradient(90deg, #3f3b4a, #f4f4f5); height: 6px; }
+.studio-theme-row input[type=range]::-webkit-slider-thumb { background: #fff; border-color: #0b0910; }
+
+/* Mixer view */
+.studio-mixer { min-height: 430px; }
+.mx-board { display: flex; gap: 0; padding: 10px; overflow-x: auto; background: #0e0c14; align-items: stretch; }
+.mx-strips { display: flex; gap: 6px; flex: 1 1 auto; }
+.mx-strip { --mx-color: #7c3aed; flex: 0 0 96px; width: 96px; display: flex; flex-direction: column; gap: 6px; padding: 0 0 8px; border-radius: 8px; background: #17141f; border: 1px solid rgba(255, 255, 255, 0.07); cursor: pointer; transition: border-color 0.12s; }
+.mx-strip[data-selected="true"] { border-color: color-mix(in srgb, var(--mx-color) 80%, white 10%); box-shadow: 0 0 0 1px var(--mx-color); }
+.mx-strip[data-dim="true"] { opacity: 0.4; }
+.mx-strip[data-master="true"] { flex-basis: 110px; width: 110px; margin-left: 10px; cursor: default; background: #1d1a26; border-color: rgba(255, 255, 255, 0.16); }
+.mx-head { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border-radius: 7px 7px 0 0; background: color-mix(in srgb, var(--mx-color) 38%, #17141f); border-bottom: 2px solid var(--mx-color); font-size: 11px; font-weight: 600; color: #fff; }
+.mx-kind { font-size: 12px; opacity: 0.85; }
+.mx-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-devices { display: flex; flex-direction: column; gap: 3px; padding: 0 6px; min-height: 66px; }
+.mx-chip { font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.07); color: #d4d4d8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-chip[data-instrument="true"] { background: color-mix(in srgb, var(--mx-color) 35%, transparent); color: #fff; }
+.mx-chip[data-empty="true"] { background: transparent; color: #6b6675; font-style: italic; }
+.mx-pan { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 8px; }
+.mx-pan input { width: 100%; }
+.mx-pan-val { font-size: 9.5px; color: #8b8299; font-variant-numeric: tabular-nums; }
+.mx-fader-area { position: relative; display: flex; justify-content: center; gap: 6px; height: 220px; padding: 4px 6px; }
+.mx-scale { position: relative; width: 16px; height: 100%; }
+.mx-scale span { position: absolute; right: 0; font-size: 8.5px; color: #6b6675; transform: translateY(50%); font-variant-numeric: tabular-nums; }
+.mx-fader { -webkit-appearance: none; appearance: none; writing-mode: vertical-lr; direction: rtl; width: 24px; height: 100%; background: transparent; margin: 0; }
+.mx-fader::-webkit-slider-runnable-track { width: 4px; border-radius: 2px; background: #05040a; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.mx-fader::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 14px; margin-left: -10px; border-radius: 3px; background: linear-gradient(180deg, #f4f4f5, #a1a1aa); border: 1px solid #0b0910; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6); }
+.mx-meter { position: relative; display: flex; gap: 2px; width: 16px; height: 100%; }
+.mx-meter-bar { position: relative; flex: 1; border-radius: 2px; overflow: hidden; background: linear-gradient(0deg, #22c55e 0%, #22c55e 62%, #eab308 82%, #ef4444 100%); }
+.mx-meter-cover { position: absolute; inset: 0; background: #08070d; transform-origin: top; transform: scaleY(1); }
+.mx-meter-hold { position: absolute; left: 0; right: 0; height: 2px; background: #fff; bottom: 0; pointer-events: none; opacity: 0.85; }
+.mx-meter-clip { position: absolute; top: -5px; left: 0; right: 0; height: 3px; border-radius: 1px; background: #3f3b4a; }
+.mx-meter-clip[data-on="true"] { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+.mx-db { text-align: center; font-size: 11px; color: #e4e4e7; font-variant-numeric: tabular-nums; }
+.mx-db small { color: #6b6675; font-size: 9px; }
+.mx-btns { display: flex; justify-content: center; gap: 4px; min-height: 24px; }
+.mx-btn { width: 24px; height: 22px; border-radius: 5px; font-size: 10.5px; font-weight: 700; color: #a1a1aa; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; }
+.mx-btn:hover { color: #fff; }
+.mx-btn[data-kind="m"][data-on="true"] { background: #f59e0b; color: #111; border-color: #f59e0b; }
+.mx-btn[data-kind="s"][data-on="true"] { background: #38bdf8; color: #111; border-color: #38bdf8; }
+.mx-btn[data-kind="r"][data-on="true"] { background: #ef4444; color: #fff; border-color: #ef4444; }
+.mx-foot { text-align: center; font-size: 10px; color: #6b6675; }
+
+/* Rack stages: MIDI FX -> instrument -> audio FX */
+.studio-fx-stage { flex: 0 0 22px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: rgba(255, 255, 255, 0.04); color: #8b8299; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase; user-select: none; }
+.studio-fx-stage[data-stage="midi"] { color: #5eead4; background: rgba(94, 234, 212, 0.08); }
+.studio-fx-stage[data-stage="instrument"] { color: #c084fc; background: rgba(192, 132, 252, 0.1); }
+.studio-fx-stage[data-stage="audio"] { color: #fbbf24; background: rgba(251, 191, 36, 0.08); }
+.studio-fx-module[data-stage="midi"] { border-top: 2px solid rgba(94, 234, 212, 0.6); }
+.studio-fx-module[data-stage="instrument"] { border-top: 2px solid rgba(192, 132, 252, 0.7); }
