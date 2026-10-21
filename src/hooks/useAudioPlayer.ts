@@ -11,6 +11,8 @@ export interface AudioPlayerOptions {
   blob?: Blob;
   /** Force mute state, ignoring local isMuted. Used for global solo/mute functionality */
   forceMute?: boolean;
+  /** Waveform height in px (default 96). Updates live when it changes. */
+  waveHeight?: number;
 }
 
 export function useAudioPlayer(
@@ -94,6 +96,11 @@ export function useAudioPlayer(
       isWsPlayingRef.current = false;
     };
   }, [interactive]);
+
+  const waveHeight = options?.waveHeight;
+  useEffect(() => {
+    if (waveHeight) wavesurfer.current?.setOptions({ height: waveHeight });
+  }, [waveHeight]);
 
   // Handle URL/Blob change (resets play state and duration so the new wavesurfer starts fresh)
   useEffect(() => {
