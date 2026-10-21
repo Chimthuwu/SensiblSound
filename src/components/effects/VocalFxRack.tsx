@@ -255,18 +255,13 @@ export function VocalFxRack() {
               Prevents label+toggles overflow in narrow grid columns. */}
           <div className="border-b border-white/[0.02] pb-1.5 flex flex-col gap-1.5">
             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 font-sans">
-              <Music size={11} className="text-primary" /> Vocals &amp; Doubler
+              <Music size={11} className="text-primary" /> T-Pain &amp; Doubler
             </span>
             <div className="flex items-center justify-end gap-1">
               <FxToggleButton
                 enabled={fxSettings.autotuneEnabled}
                 onClick={() => setFxSettings({ autotuneEnabled: !fxSettings.autotuneEnabled })}
-                label="AutoTune"
-              />
-              <FxToggleButton
-                enabled={fxSettings.pitchCorrectionEnabled}
-                onClick={() => setFxSettings({ pitchCorrectionEnabled: !fxSettings.pitchCorrectionEnabled })}
-                label="Pitch Corr"
+                label="T-Pain"
               />
               <FxToggleButton
                 enabled={fxSettings.doubleEnabled}
@@ -277,7 +272,7 @@ export function VocalFxRack() {
           </div>
 
           {/* Autotune sub-section: gates on autotuneEnabled */}
-          <div className={`flex flex-col gap-2.5 transition-opacity duration-300 ${(fxEnabled && (fxSettings.autotuneEnabled || fxSettings.pitchCorrectionEnabled)) ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+          <div className={`flex flex-col gap-2.5 transition-opacity duration-300 ${(fxEnabled && fxSettings.autotuneEnabled) ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
             <div className="flex gap-2">
               <select
                 value={fxSettings.autotuneKey}
@@ -299,34 +294,6 @@ export function VocalFxRack() {
                 <span>Retune Speed</span>
                 <span className="font-mono text-primary font-bold">{fxSettings.autotuneSpeed}ms</span>
               </div>
-            <div>
-              <div className="flex justify-between text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
-                <span>Formant Shift</span>
-                <span className="font-mono text-primary font-bold">{fxSettings.formantShift}st</span>
-              </div>
-              <input
-                type="range"
-                min="-12"
-                max="12"
-                value={fxSettings.formantShift}
-                onChange={(e) => setFxSettings({ formantShift: parseInt(e.target.value) })}
-                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
-                <span>Pitch Shift</span>
-                <span className="font-mono text-primary font-bold">{fxSettings.pitchShiftSemitones}st</span>
-              </div>
-              <input
-                type="range"
-                min="-12"
-                max="12"
-                value={fxSettings.pitchShiftSemitones}
-                onChange={(e) => setFxSettings({ pitchShiftSemitones: parseInt(e.target.value) })}
-                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-              />
-            </div>
               <input
                 type="range"
                 min="0" max="100"
@@ -476,19 +443,6 @@ export function VocalFxRack() {
                 min="0" max="100"
                 value={fxSettings.reverbWet}
                 onChange={(e) => setFxSettings({ reverbWet: parseInt(e.target.value) })}
-                className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
-              />
-            </div>
-            <div>
-              <div className="flex justify-between text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
-                <span>Reverb Decay</span>
-                <span className="font-mono text-zinc-400 font-semibold">{fxSettings.reverbDecay}%</span>
-              </div>
-              <input
-                type="range"
-                min="0" max="100"
-                value={fxSettings.reverbDecay}
-                onChange={(e) => setFxSettings({ reverbDecay: parseInt(e.target.value) })}
                 className="w-full accent-primary cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
               />
             </div>

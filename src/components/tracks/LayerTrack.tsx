@@ -3,8 +3,6 @@ import { Volume2, VolumeX, Trash2, Download, Check } from 'lucide-react';
 import type { VocalLayer } from '../../types';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
-import { TrackDecor } from './TrackDecor';
-import { useTrackLayout } from '../../hooks/useTrackLayout';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
 
 interface LayerTrackProps {
@@ -29,12 +27,11 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
   const isAnyTrackSoloed = useSessionStore(state => state.soloedTracks).size > 0;
   const forceMute = isGlobalMuted || (isAnyTrackSoloed && !isTrackSoloed);
   const { toggleMuteTrack, toggleSoloTrack } = useSessionStore();
-  const layout = useTrackLayout(trackId, 112);
 
   const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
     containerRef,
     layer.url,
-    { startOffsetMs: layer.transportStartMs, interactive: true, forceMute, waveHeight: layout.waveHeight }
+    { startOffsetMs: layer.transportStartMs, interactive: true, forceMute }
   );
 
   useEffect(() => {
@@ -88,8 +85,7 @@ export function LayerTrack({ layer, index, totalDurationMs, onRemove }: LayerTra
   };
 
   return (
-    <div className="bg-surface rounded-xl flex flex-col md:flex-row shadow-lg shadow-black/20 border border-white/5 relative overflow-hidden group" style={{ height: layout.height }} onMouseDown={layout.onMouseDown}>
-      <TrackDecor trackId={trackId} {...layout} />
+    <div className="bg-surface rounded-xl flex flex-col md:flex-row shadow-lg shadow-black/20 border border-white/5 relative overflow-hidden group h-28">
       {/* Left Sidebar */}
       <div className="w-full md:w-64 p-3 flex flex-col justify-between border-b md:border-b-0 md:border-r border-white/10 bg-[#141416] shrink-0 z-20">
         <div className="flex items-center justify-between">

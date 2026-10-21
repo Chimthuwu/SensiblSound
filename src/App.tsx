@@ -52,20 +52,7 @@ function App() {
         return;
       }
 
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.code === 'KeyA') {
-        // Select every track: backing, the active take (if any) and all layers.
-        e.preventDefault();
-        const { activeTake: take, layers: ls, selectAllTracks } = useSessionStore.getState();
-        selectAllTracks(['backing', ...(take ? ['active_take'] : []), ...ls.map((l) => l.id)]);
-      } else if (mod && e.code === 'KeyG') {
-        // Ctrl+G groups the selected tracks; Ctrl+Shift+G ungroups them.
-        e.preventDefault();
-        const { groupSelected, ungroupSelected } = useSessionStore.getState();
-        if (e.shiftKey) ungroupSelected(); else groupSelected();
-      } else if (e.code === 'Escape') {
-        useSessionStore.getState().clearSelection();
-      } else if (e.code === 'Space') {
+      if (e.code === 'Space') {
         e.preventDefault();
         setIsPlaying(!isPlaying);
       } else if (e.code === 'KeyR') {

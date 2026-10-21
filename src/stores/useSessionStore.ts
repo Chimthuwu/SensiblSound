@@ -1,18 +1,7 @@
 import { create } from 'zustand';
-import type { SessionState, TrackGroup } from '../types';
+import type { SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
-
-const GROUP_COLORS = ['#a855f7', '#22d3ee', '#f59e0b', '#34d399', '#f472b6'];
-
-// A group needs at least two members to mean anything.
-const pruneGroups = (groups: TrackGroup[]) => groups.filter((g) => g.trackIds.length >= 2);
-
-// Grouped tracks act as one: expand an id to its whole group.
-const withGroupMates = (groups: TrackGroup[], id: string) =>
-  groups.find((g) => g.trackIds.includes(id))?.trackIds ?? [id];
-
-let groupCounter = 0;
 
 export const useSessionStore = create<SessionState>((set) => ({
   bpm: 120,
@@ -39,9 +28,6 @@ export const useSessionStore = create<SessionState>((set) => ({
   recordingsHistory: recordingHistoryIndex.list(),
   mutedTracks: new Set(),
   soloedTracks: new Set(),
-  selectedTracks: new Set(),
-  trackHeights: {},
-  groups: [],
   fxSettings: {
     autotuneEnabled: false,
     compressorEnabled: false,
@@ -51,9 +37,6 @@ export const useSessionStore = create<SessionState>((set) => ({
     autotuneKey: 'C',
     autotuneScale: 'Major',
     autotuneSpeed: 50,
-    formantShift: 0,
-    pitchShiftSemitones: 0,
-    pitchCorrectionEnabled: false,
     compression: 40,
     doubleEnabled: false,
     doubleWidth: 70,
@@ -63,7 +46,6 @@ export const useSessionStore = create<SessionState>((set) => ({
     delayFeedback: 30,
     delayTime: 0.3,
     reverbWet: 40,
-    reverbDecay: 50,
     micGain: 100,
   },
 
@@ -79,9 +61,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   })),
   
   removeLayer: (id) => set((state) => ({
-    layers: state.layers.filter((layer) => layer.id !== id),
-    selectedTracks: new Set([...state.selectedTracks].filter((t) => t !== id)),
-    groups: pruneGroups(state.groups.map((g) => ({ ...g, trackIds: g.trackIds.filter((t) => t !== id) }))),
+    layers: state.layers.filter((layer) => layer.id !== id)
   })),
   
   clearLayers: () => set({ layers: [] }),
@@ -154,52 +134,21 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   toggleMuteTrack: (trackId) => set((state) => {
     const newMuted = new Set(state.mutedTracks);
-    const turnOn = !newMuted.has(trackId);
-    withGroupMates(state.groups, trackId).forEach((t) => (turnOn ? newMuted.add(t) : newMuted.delete(t)));
+    if (newMuted.has(trackId)) {
+      newMuted.delete(trackId);
+    } else {
+      newMuted.add(trackId);
+    }
     return { mutedTracks: newMuted };
   }),
 
   toggleSoloTrack: (trackId) => set((state) => {
     const newSoloed = new Set(state.soloedTracks);
-    const turnOn = !newSoloed.has(trackId);
-    withGroupMates(state.groups, trackId).forEach((t) => (turnOn ? newSoloed.add(t) : newSoloed.delete(t)));
+    if (newSoloed.has(trackId)) {
+      newSoloed.delete(trackId);
+    } else {
+      newSoloed.add(trackId);
+    }
     return { soloedTracks: newSoloed };
   }),
-
-  selectTrack: (trackId, additive) => set((state) => {
-    const mates = withGroupMates(state.groups, trackId);
-    if (!additive) return { selectedTracks: new Set(mates) };
-    const next = new Set(state.selectedTracks);
-    const turnOn = !next.has(trackId);
-    mates.forEach((t) => (turnOn ? next.add(t) : next.delete(t)));
-    return { selectedTracks: next };
-  }),
-
-  selectAllTracks: (trackIds) => set({ selectedTracks: new Set(trackIds) }),
-
-  clearSelection: () => set((state) => (state.selectedTracks.size ? { selectedTracks: new Set() } : {})),
-
-  setTrackHeights: (trackIds, height) => set((state) => {
-    const trackHeights = { ...state.trackHeights };
-    trackIds.forEach((t) => { trackHeights[t] = height; });
-    return { trackHeights };
-  }),
-
-  groupSelected: () => set((state) => {
-    const members = [...state.selectedTracks];
-    if (members.length < 2) return {};
-    const rest = state.groups.map((g) => ({ ...g, trackIds: g.trackIds.filter((t) => !state.selectedTracks.has(t)) }));
-    groupCounter += 1;
-    const group: TrackGroup = {
-      id: crypto.randomUUID(),
-      name: `Group ${groupCounter}`,
-      color: GROUP_COLORS[(groupCounter - 1) % GROUP_COLORS.length],
-      trackIds: members,
-    };
-    return { groups: [...pruneGroups(rest), group] };
-  }),
-
-  ungroupSelected: () => set((state) => ({
-    groups: state.groups.filter((g) => !g.trackIds.some((t) => state.selectedTracks.has(t))),
-  })),
 }));

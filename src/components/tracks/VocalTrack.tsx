@@ -6,8 +6,6 @@ import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { TimeRuler } from './TimeRuler';
 import { LayerTrack } from './LayerTrack';
-import { TrackDecor } from './TrackDecor';
-import { useTrackLayout } from '../../hooks/useTrackLayout';
 
 import { getLayerTimelineDurationMs } from '../../utils/timeline';
 import { downloadBlobUrl, buildTakeFilename } from '../../utils/download';
@@ -149,7 +147,6 @@ export function VocalTrack() {
   const { devices, selectedDeviceId, setSelectedDeviceId, isReady: micReady, stream } = useAudioRecorder();
 
   const trackId = 'active_take';
-  const layout = useTrackLayout(trackId, 128);
   const isGlobalMuted = useSessionStore(state => state.mutedTracks).has(trackId);
   const isTrackSoloed = useSessionStore(state => state.soloedTracks).has(trackId);
   const isAnyTrackSoloed = useSessionStore(state => state.soloedTracks).size > 0;
@@ -164,7 +161,7 @@ export function VocalTrack() {
   const { isReady, duration, volume, setVolume, isMuted, setIsMuted } = useAudioPlayer(
     containerRef,
     activeTake?.url,
-    { startOffsetMs: activeTake?.transportStartMs ?? 0, interactive: true, blob: activeTake?.blob, forceMute, waveHeight: layout.waveHeight }
+    { startOffsetMs: activeTake?.transportStartMs ?? 0, interactive: true, blob: activeTake?.blob, forceMute }
   );
 
   // Depend on activeTake?.id (stable) rather than the object itself — the
@@ -215,8 +212,7 @@ export function VocalTrack() {
 
   return (
     <section className="flex flex-col gap-1 w-full">
-      <div className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group" style={{ height: layout.height }} onMouseDown={layout.onMouseDown}>
-        <TrackDecor trackId={trackId} {...layout} />
+      <div className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group h-32">
         {/* Background Studio Glow Effect */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 group-hover:bg-primary/10 transition-colors duration-1000" />
 
