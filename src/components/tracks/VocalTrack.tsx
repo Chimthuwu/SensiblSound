@@ -212,7 +212,7 @@ export function VocalTrack() {
 
   return (
     <section className="flex flex-col gap-1 w-full">
-      <div className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group h-32">
+      <div className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group min-h-[9.5rem]">
         {/* Background Studio Glow Effect */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10 group-hover:bg-primary/10 transition-colors duration-1000" />
 
@@ -274,7 +274,7 @@ export function VocalTrack() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setIsMonitoring(!isMonitoring)}
-                className={`flex-1 text-[10px] px-2 py-1 rounded border transition-all duration-300 flex items-center justify-center gap-1 cursor-pointer font-sans font-semibold ${
+                className={`flex-1 shrink-0 min-w-0 text-[10px] px-2 py-1 rounded border transition-all duration-300 flex items-center justify-center gap-1 cursor-pointer font-sans font-semibold whitespace-nowrap ${
                   isMonitoring 
                     ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' 
                     : 'bg-white/[0.04] text-zinc-400 border-white/[0.05] hover:text-white hover:bg-white/[0.08]'
@@ -289,7 +289,8 @@ export function VocalTrack() {
                 value={selectedDeviceId}
                 onChange={(e) => setSelectedDeviceId(e.target.value)}
                 disabled={isRecording || !micReady}
-                className="flex-1 text-[10px] bg-black/40 border border-white/10 rounded px-1 py-1 text-zinc-300 outline-none focus:border-primary/50 transition-all cursor-pointer font-sans max-w-[50%]"
+                title={devices.find((d) => d.deviceId === selectedDeviceId)?.label || 'Microphone input'}
+                className="flex-1 min-w-0 w-0 truncate text-[10px] bg-black/40 border border-white/10 rounded px-1 py-1 text-zinc-300 outline-none focus:border-primary/50 transition-all cursor-pointer font-sans max-w-[50%]"
               >
                 {!micReady && <option value="">Req mic...</option>}
                 {devices.map(device => (
@@ -321,7 +322,7 @@ export function VocalTrack() {
         </div>
         
         {/* Right Waveform / Oscilloscope */}
-        <div className={`flex-1 relative overflow-hidden transition-all duration-300 border-l border-white/5 ${
+        <div className={`flex-1 relative overflow-hidden transition-all duration-300 border-l border-white/5 min-h-[96px] md:min-h-0 ${
           isRecording 
             ? 'shadow-[inset_0_0_20px_rgba(239,68,68,0.15)] bg-red-950/20' 
             : 'hover:bg-black/20 shadow-[inset_0_2px_8px_rgba(0,0,0,0.3)] bg-[#1a1a1c]'

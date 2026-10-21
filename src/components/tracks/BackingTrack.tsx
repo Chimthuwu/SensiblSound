@@ -59,7 +59,7 @@ export function BackingTrack() {
   };
 
   return (
-    <section className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group h-32">
+    <section className="bg-surface rounded-2xl flex flex-col md:flex-row shadow-xl shadow-black/40 border border-white/5 relative overflow-hidden group min-h-[8rem]">
       {/* Left Sidebar */}
       <div className="w-full md:w-64 p-3 md:p-4 flex flex-col justify-between border-b md:border-b-0 md:border-r border-white/10 bg-[#141416] shrink-0 z-20">
         <div className="flex items-center justify-between">
