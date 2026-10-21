@@ -233,6 +233,10 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   extraTracks: [],
 
+  viewMode: readFlag('sensi-mixer') ? 'mixer' : 'arrange',
+  setViewMode: (viewMode) => { writeFlag('sensi-mixer', viewMode === 'mixer'); set({ viewMode }); },
+  masterVolume: 1,
+  setMasterVolume: (v) => set({ masterVolume: Math.max(0, Math.min(1, v)) }),
   midiStatus: 'idle',
   setMidiStatus: (midiStatus) => set({ midiStatus }),
   midiInputs: [],

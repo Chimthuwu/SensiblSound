@@ -223,6 +223,13 @@ export interface SessionState {
   setTrackOrder: (ids: string[]) => void;
   toggleSoloTrack: (trackId: string) => void;
 
+  // Centre panel: the arrangement or the mixer.
+  viewMode: 'arrange' | 'mixer';
+  setViewMode: (m: 'arrange' | 'mixer') => void;
+  /** Master fader, 0..1 (1 = 0 dB). */
+  masterVolume: number;
+  setMasterVolume: (v: number) => void;
+
   // External MIDI controllers (Web MIDI).
   midiStatus: 'idle' | 'ready' | 'denied' | 'unsupported';
   setMidiStatus: (s: SessionState['midiStatus']) => void;

@@ -15,10 +15,12 @@ import { TransportBar } from './components/studio/TransportBar';
 import { SampleBrowser } from './components/studio/SampleBrowser';
 import { MidiEditor } from './components/studio/MidiEditor';
 import { WarpUI } from './components/studio/WarpUI';
+import { Mixer } from './components/studio/Mixer';
 import { startMidiEngine } from './midi/midiEngine';
 import { startMidiInput } from './midi/midiInput';
 
 function App() {
+  const viewMode = useSessionStore((s) => s.viewMode);
   const {
     isRecording, isPlaying, setIsRecording, setIsPlaying,
     rewindTransport, activeTake, layers,
@@ -133,7 +135,7 @@ function App() {
 
       <div className="studio-shell">
       <main className="studio">
-        <Arrangement />
+        {viewMode === 'mixer' ? <Mixer /> : <Arrangement />}
         <MidiEditor />
         <FXRack />
       </main>

@@ -1,46 +1,108 @@
-import { useEffect, useState } from 'react';
-import { AudioWaveform, HardDrive, Magnet, Settings, Share2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AudioWaveform, HardDrive, Magnet, Palette, Settings, Share2, SlidersVertical } from 'lucide-react';
 import { useContextMenu } from './ContextMenu';
 import { connectMidi } from '../../midi/midiInput';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { googleDrive } from '../../lib/googleDrive';
 
-const HUE_KEY = 'studio-hue';
+const HUE_KEY = 'studio-hue'; // the old hue-only setting, still read so nobody loses their colour
+const THEME_KEY = 'studio-theme';
 
-function readHue(): number {
+interface Theme { hue: number; saturation: number; contrast: number }
+const DEFAULT_THEME: Theme = { hue: 0, saturation: 100, contrast: 100 };
+
+const clamp = (v: unknown, lo: number, hi: number, fallback: number) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback;
+};
+
+function readTheme(): Theme {
   try {
-    const v = Number(localStorage.getItem(HUE_KEY));
-    return Number.isFinite(v) ? Math.min(360, Math.max(0, v)) : 0;
+    const raw = localStorage.getItem(THEME_KEY);
+    if (raw) {
+      const t = JSON.parse(raw) as Partial<Theme>;
+      return { hue: clamp(t.hue, 0, 360, 0), saturation: clamp(t.saturation, 40, 200, 100), contrast: clamp(t.contrast, 70, 140, 100) };
+    }
+    const legacy = localStorage.getItem(HUE_KEY);
+    if (legacy !== null) return { ...DEFAULT_THEME, hue: clamp(legacy, 0, 360, 0) };
   } catch {
-    return 0;
+    // Storage can be blocked; the theme still works for this visit.
   }
+  return DEFAULT_THEME;
 }
 
-/** Shifts the whole app's colour hue. Saved per browser. */
-function HueSlider() {
-  const [hue, setHue] = useState(readHue);
+/** The Theme button: opens a small panel with hue, saturation and contrast for the whole app. Saved per browser. */
+function ThemeMenu() {
+  const [theme, setTheme] = useState<Theme>(readTheme);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--hue-shift', `${hue}deg`);
+    const el = document.documentElement.style;
+    el.setProperty('--hue-shift', `${theme.hue}deg`);
+    el.setProperty('--theme-sat', String(theme.saturation / 100));
+    el.setProperty('--theme-contrast', String(theme.contrast / 100));
     try {
-      localStorage.setItem(HUE_KEY, String(hue));
+      localStorage.setItem(THEME_KEY, JSON.stringify(theme));
     } catch {
-      // Storage can be blocked; the slider still works for this visit.
+      // see readTheme
     }
-  }, [hue]);
+  }, [theme]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const set = (patch: Partial<Theme>) => setTheme((t) => ({ ...t, ...patch }));
+  const changed = theme.hue !== 0 || theme.saturation !== 100 || theme.contrast !== 100;
 
   return (
-    <label className="studio-hue" title="Shift the app's colours">
-      <span>Hue</span>
-      <input
-        type="range"
-        min={0}
-        max={360}
-        step={1}
-        value={hue}
-        onChange={(e) => setHue(Number(e.target.value))}
-        aria-label="Hue"
-      />
+    <div className="studio-theme" ref={rootRef}>
+      <button
+        className="studio-theme-btn"
+        type="button"
+        data-changed={String(changed)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen((o) => !o)}
+        title="Change the app's colours"
+      >
+        <Palette size={14} aria-hidden="true" />
+        <span>Theme</span>
+        <span className="studio-caret" aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <div className="studio-theme-pop" role="dialog" aria-label="Theme">
+          <ThemeRow label="Hue" value={theme.hue} min={0} max={360} unit="°" onChange={(hue) => set({ hue })} />
+          <ThemeRow label="Saturation" value={theme.saturation} min={40} max={200} unit="%" onChange={(saturation) => set({ saturation })} />
+          <ThemeRow label="Contrast" value={theme.contrast} min={70} max={140} unit="%" onChange={(contrast) => set({ contrast })} />
+          <button className="studio-mini-btn" type="button" disabled={!changed} onClick={() => setTheme(DEFAULT_THEME)}>
+            Reset
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ThemeRow({ label, value, min, max, unit, onChange }: { label: string; value: number; min: number; max: number; unit: string; onChange: (v: number) => void }) {
+  return (
+    <label className="studio-theme-row" data-kind={label.toLowerCase()}>
+      <span>{label}</span>
+      <input type="range" min={min} max={max} step={1} value={value} onChange={(e) => onChange(Number(e.target.value))} onDoubleClick={() => onChange(label === 'Hue' ? 0 : 100)} aria-label={label} title="Double-click to reset" />
+      <output>{value}{unit}</output>
     </label>
   );
 }
@@ -134,6 +196,25 @@ function MidiPill() {
   );
 }
 
+/** Switches the centre panel between the arrangement and the mixer. */
+function MixerToggle() {
+  const mode = useSessionStore((s) => s.viewMode);
+  const setMode = useSessionStore((s) => s.setViewMode);
+  return (
+    <button
+      className="studio-warp-btn"
+      type="button"
+      data-on={String(mode === 'mixer')}
+      aria-pressed={mode === 'mixer'}
+      onClick={() => setMode(mode === 'mixer' ? 'arrange' : 'mixer')}
+      title={mode === 'mixer' ? 'Back to the arrangement' : 'Show the mixer'}
+    >
+      <SlidersVertical size={14} aria-hidden="true" />
+      <span>Mixer</span>
+    </button>
+  );
+}
+
 export function TopBar() {
   const backupStatus = useSessionStore((s) => s.backupStatus);
   const cloudBackupStatus = useSessionStore((s) => s.cloudBackupStatus);
@@ -174,9 +255,10 @@ export function TopBar() {
       </div>
 
       <div className="studio-top-spacer" />
+      <MixerToggle />
       <WarpButton />
       <MidiPill />
-      <HueSlider />
+      <ThemeMenu />
 
       <StatusPill state={localPill} label="Saved on This Device" />
       <StatusPill state={cloudPill} label="Backed Up to Cloud" />

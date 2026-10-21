@@ -1,4 +1,4 @@
-import { playbackContext } from '../hooks/useAudioPlayer';
+import { createMeterTap, masterIn, playbackContext } from '../utils/audioBus';
 import { useSessionStore } from '../stores/useSessionStore';
 import { DEFAULT_DRUMS, DEFAULT_SYNTH, type Instrument, type MidiKind } from '../types';
 import { playDrum, playSynthNote } from './instruments';
@@ -10,6 +10,7 @@ const TICK_MS = 30;
 interface Channel {
   gain: GainNode;
   pan: StereoPannerNode;
+  untap: () => void;
 }
 
 const channels = new Map<string, Channel>();
@@ -22,8 +23,8 @@ function channel(trackId: string): Channel {
     const gain = ctx.createGain();
     const pan = ctx.createStereoPanner();
     gain.connect(pan);
-    pan.connect(ctx.destination);
-    ch = { gain, pan };
+    pan.connect(masterIn());
+    ch = { gain, pan, untap: createMeterTap(ctx, pan, trackId) };
     channels.set(trackId, ch);
   }
   return ch;
@@ -37,6 +38,7 @@ function syncChannels() {
   const live = new Set<string>(liveIds);
   for (const [id, ch] of channels) {
     if (!live.has(id)) {
+      ch.untap();
       ch.gain.disconnect();
       ch.pan.disconnect();
       channels.delete(id);

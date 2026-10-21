@@ -19,6 +19,7 @@ function HeadlessPlayer({
   forceMute,
   volume,
   pan,
+  meterId,
   onDuration,
 }: {
   url?: string;
@@ -27,6 +28,7 @@ function HeadlessPlayer({
   forceMute?: boolean;
   volume?: number;
   pan?: number;
+  meterId?: string;
   onDuration?: (ms: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,6 +39,7 @@ function HeadlessPlayer({
     forceMute,
     volume,
     pan,
+    meterId,
   });
 
   // Keep the callback in a ref so an unstable identity (e.g. an inline arrow
@@ -109,6 +112,7 @@ export function AudioEngine() {
           forceMute={isSilenced('backing')}
           volume={trackVolumes['backing'] ?? 1}
           pan={trackPans['backing'] ?? 0}
+          meterId="backing"
           onDuration={setBackingTrackDurationMs}
         />
       )}
@@ -121,6 +125,7 @@ export function AudioEngine() {
           forceMute={isSilenced('active_take')}
           volume={trackVolumes['active_take'] ?? 1}
           pan={trackPans['active_take'] ?? 0}
+          meterId="active_take"
           onDuration={setActiveTakeDurationMs}
         />
       )}
@@ -135,6 +140,7 @@ export function AudioEngine() {
             forceMute={isSilenced(t.id)}
             volume={trackVolumes[t.id] ?? 1}
             pan={trackPans[t.id] ?? 0}
+            meterId={t.id}
             onDuration={(ms) => setExtraTrackDuration(t.id, ms)}
           />
         ) : null,
@@ -149,6 +155,7 @@ export function AudioEngine() {
           forceMute={isSilenced(layer.id)}
           volume={trackVolumes[layer.id] ?? 1}
           pan={trackPans[layer.id] ?? 0}
+          meterId={layer.id}
           onDuration={(ms) => setLayerDurationMs(layer.id, ms)}
         />
       ))}

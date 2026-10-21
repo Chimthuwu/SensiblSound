@@ -141,7 +141,7 @@ export function playDrum(ctx: BaseAudioContext, out: AudioNode, p: DrumParams, p
   g.connect(out);
   switch (pad.id) {
     case 'kick':
-      toneVoice(ctx, g, when, { from: 160 * t, to: 42 * t, sweep: 0.12 * d, peak: 1.1, decay: 0.38 * d });
+      toneVoice(ctx, g, when, { from: 160 * t, to: 42 * t, sweep: 0.12 * d, peak: 0.9, decay: 0.38 * d });
       noiseVoice(ctx, g, when, { type: 'lowpass', freq: 900, peak: 0.25, decay: 0.02 });
       break;
     case 'snare':

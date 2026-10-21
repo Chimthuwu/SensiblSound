@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { useSessionStore } from '../stores/useSessionStore';
+import { createMeterTap, masterIn, playbackContext } from '../utils/audioBus';
 
 export interface AudioPlayerOptions {
   /** Project-time offset (in ms) at which this element should start being audible. */
@@ -15,21 +16,8 @@ export interface AudioPlayerOptions {
   volume?: number;
   /** Stereo pan, -1 (left) to 1 (right). Default 0. */
   pan?: number;
-}
-
-// One AudioContext shared by every player, so pan nodes can live in it.
-let sharedCtx: AudioContext | null = null;
-export function playbackContext(): AudioContext {
-  if (!sharedCtx) sharedCtx = new AudioContext();
-  return sharedCtx;
-}
-// Browsers keep audio suspended until a user gesture; resume on the first click or key press.
-if (typeof window !== 'undefined') {
-  const resume = () => {
-    if (sharedCtx?.state === 'suspended') void sharedCtx.resume();
-  };
-  window.addEventListener('pointerdown', resume);
-  window.addEventListener('keydown', resume);
+  /** Lane this player belongs to; its level meter in the mixer reads from here. */
+  meterId?: string;
 }
 
 export function useAudioPlayer(
@@ -48,7 +36,8 @@ export function useAudioPlayer(
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   // The media element routed through a stereo panner, once per element.
-  const panRef = useRef<{ el: HTMLMediaElement; panner: StereoPannerNode } | null>(null);
+  const panRef = useRef<{ el: HTMLMediaElement; panner: StereoPannerNode; untap?: () => void } | null>(null);
+  useEffect(() => () => panRef.current?.untap?.(), []);
 
   // Route the element through a pan node. The element's volume still comes from WaveSurfer.
   useEffect(() => {
@@ -62,8 +51,10 @@ export function useAudioPlayer(
         const source = ctx.createMediaElementSource(el);
         const panner = ctx.createStereoPanner();
         source.connect(panner);
-        panner.connect(ctx.destination);
-        panRef.current = { el, panner };
+        panner.connect(masterIn());
+        const untap = options?.meterId ? createMeterTap(ctx, panner, options.meterId) : undefined;
+        panRef.current?.untap?.();
+        panRef.current = { el, panner, untap };
       } catch (err) {
         console.warn('Pan unavailable for this track', err);
         return;
