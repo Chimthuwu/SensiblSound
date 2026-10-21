@@ -223,6 +223,32 @@ export interface SessionState {
   setTrackOrder: (ids: string[]) => void;
   toggleSoloTrack: (trackId: string) => void;
 
+  // External MIDI controllers (Web MIDI).
+  midiStatus: 'idle' | 'ready' | 'denied' | 'unsupported';
+  setMidiStatus: (s: SessionState['midiStatus']) => void;
+  midiInputs: { id: string; name: string }[];
+  setMidiInputs: (inputs: { id: string; name: string }[]) => void;
+  /** 'all' listens to every connected controller. */
+  midiInputId: string;
+  setMidiInputId: (id: string) => void;
+  /** Ticks on incoming notes; drives the activity light. */
+  midiActivity: number;
+  bumpMidiActivity: () => void;
+
+  // Auto-warp: audio that drops in is snapped and stretched to the project tempo while this is on.
+  autoWarp: boolean;
+  setAutoWarp: (on: boolean) => void;
+  /** "Don't ask me again" on the warp prompt. */
+  warpPromptDisabled: boolean;
+  setWarpPromptDisabled: (off: boolean) => void;
+  /** Set while the warp prompt is open for a freshly added clip. */
+  warpPrompt: { laneId: string; name: string } | null;
+  setWarpPrompt: (p: { laneId: string; name: string } | null) => void;
+  warpBusy: number;
+  setWarpBusy: (delta: number) => void;
+  toast: { id: number; text: string } | null;
+  showToast: (text: string) => void;
+
   // MIDI: clips can sit on any lane; each lane has one instrument they play through.
   midiClips: MidiClip[];
   instruments: Record<string, Instrument>;

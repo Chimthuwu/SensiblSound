@@ -6,6 +6,7 @@ import { SAMPLE_MIME, sampleClip } from '../../utils/samples';
 import { transformClip } from '../../utils/clipTransform';
 import { ClipWaveform } from './ClipWaveform';
 import { MidiClipPreview } from './MidiClipPreview';
+import { onAudioAdded, warpLane } from '../../utils/warpActions';
 import type { MidiNote } from '../../types';
 import { useContextMenu, type MenuItem } from './ContextMenu';
 
@@ -221,6 +222,7 @@ export function Arrangement() {
     const file = e.target.files?.[0];
     if (file) {
       setBackingTrack({ id: crypto.randomUUID(), name: file.name, url: URL.createObjectURL(file), blob: file });
+      onAudioAdded('backing', file.name);
     }
     // Reset so the same file can be picked again.
     e.target.value = '';
@@ -282,8 +284,12 @@ export function Arrangement() {
     const id = e.dataTransfer.getData(SAMPLE_MIME);
     if (!id) return;
     const clip = await sampleClip(id);
-    if (trackId) setTrackClip(trackId, clip);
-    else addTrack(clip);
+    if (trackId) {
+      setTrackClip(trackId, clip);
+      onAudioAdded(trackId, clip.name);
+    } else {
+      onAudioAdded(addTrack(clip), clip.name);
+    }
   };
 
   /** Dropped audio fills an empty new track, or else creates a new track. */
@@ -293,8 +299,12 @@ export function Arrangement() {
     const file = Array.from(e.dataTransfer.files).find(isAudioFile);
     if (!file) return;
     const clip = { name: file.name, url: URL.createObjectURL(file), blob: file };
-    if (trackId) setTrackClip(trackId, clip);
-    else addTrack(clip);
+    if (trackId) {
+      setTrackClip(trackId, clip);
+      onAudioAdded(trackId, clip.name);
+    } else {
+      onAudioAdded(addTrack(clip), clip.name);
+    }
   };
 
   const isExtraTrack = (laneId: string) => extraTracks.some((t) => t.id === laneId);
@@ -487,6 +497,7 @@ export function Arrangement() {
       { label: 'Copy', disabled: !c.source, onSelect: () => copyClipObj(c) },
       { label: 'Paste', disabled: !clipboard, onSelect: () => pasteInto(laneId) },
       { kind: 'separator' },
+      { label: 'Warp to project BPM', disabled: !c.source, onSelect: () => void warpLane(laneId, { manual: true }) },
       { label: 'Reverse', disabled: !c.source, onSelect: () => void transformClipAt(sel, { reverse: true }) },
       { label: 'Double length', disabled: !c.source, onSelect: () => void transformClipAt(sel, { rate: 0.5 }) },
       { label: 'Half length', disabled: !c.source, onSelect: () => void transformClipAt(sel, { rate: 2 }) },

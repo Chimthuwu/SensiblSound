@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { DRUM_PADS, type MidiNote } from '../../types';
 import { previewNote, releaseNote } from '../../midi/midiEngine';
+import { liveNoteOff, liveNoteOn } from '../../midi/midiInput';
 
 const STEP = 0.25; // beats: sixteenth notes
 const CELL_W = 22;
@@ -15,7 +16,7 @@ const noteName = (p: number) => `${NAMES[p % 12]}${Math.floor(p / 12) - 1}`;
 // Computer keyboard as a two-row piano: Z..M is the lower octave, Q..P the upper.
 const KEY_MAP: Record<string, number> = {
   KeyZ: 0, KeyS: 1, KeyX: 2, KeyD: 3, KeyC: 4, KeyV: 5, KeyG: 6, KeyB: 7, KeyH: 8, KeyN: 9, KeyJ: 10, KeyM: 11,
-  KeyQ: 12, Digit2: 13, KeyW: 14, Digit3: 15, KeyE: 16, KeyR: 17, Digit5: 18, KeyT: 19, Digit6: 20, KeyY: 21, Digit7: 22, KeyU: 23, KeyI: 24,
+  KeyQ: 12, Digit2: 13, KeyW: 14, Digit3: 15, KeyE: 16, Digit5: 18, KeyT: 19, Digit6: 20, KeyY: 21, Digit7: 22, KeyU: 23, KeyI: 24,
 };
 // Drum pads from the keyboard: A S D F G H J K for the eight pads.
 const DRUM_KEYS: Record<string, number> = {
@@ -68,37 +69,19 @@ export function MidiEditor() {
       const pitch = k === 'drums' ? DRUM_KEYS[e.code] : KEY_MAP[e.code] !== undefined ? 48 + oct * 12 + KEY_MAP[e.code] : undefined;
       if (pitch === undefined) return;
       down.add(e.code);
-      previewNote(id, pitch, 0.85, k === 'synth');
+      liveNoteOn(pitch, 0.85, id);
     };
     const onKeyUp = (e: KeyboardEvent) => {
       const { laneId: id, kind: k, octave: oct } = liveRef.current;
       if (!down.delete(e.code) || !id || k !== 'synth') return;
-      if (KEY_MAP[e.code] !== undefined) releaseNote(id, 48 + oct * 12 + KEY_MAP[e.code]);
+      if (KEY_MAP[e.code] !== undefined) liveNoteOff(48 + oct * 12 + KEY_MAP[e.code], id);
     };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
-    let access: MIDIAccess | null = null;
-    const onMessage = (m: MIDIMessageEvent) => {
-      const { laneId: id, kind: k } = liveRef.current;
-      const d = m.data;
-      if (!d || !id) return;
-      const [status, note, vel] = d;
-      const cmd = status & 0xf0;
-      if (cmd === 0x90 && vel > 0) previewNote(id, note, vel / 127, k === 'synth');
-      else if (cmd === 0x80 || (cmd === 0x90 && vel === 0)) releaseNote(id, note);
-    };
-    if (navigator.requestMIDIAccess) {
-      navigator.requestMIDIAccess().then((a) => {
-        access = a;
-        a.inputs.forEach((input) => { input.onmidimessage = onMessage; });
-        a.onstatechange = () => a.inputs.forEach((input) => { input.onmidimessage = onMessage; });
-      }).catch(() => {});
-    }
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
-      access?.inputs.forEach((input) => { input.onmidimessage = null; });
     };
   }, []);
 

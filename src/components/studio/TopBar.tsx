@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { HardDrive, Settings, Share2 } from 'lucide-react';
+import { AudioWaveform, HardDrive, Magnet, Settings, Share2 } from 'lucide-react';
+import { useContextMenu } from './ContextMenu';
+import { connectMidi } from '../../midi/midiInput';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { googleDrive } from '../../lib/googleDrive';
 
@@ -52,6 +54,86 @@ function StatusPill({ state, label }: { state: 'ok' | 'cloud' | 'off'; label: st
   );
 }
 
+/** Magnet + waveform: when on, audio that drops in is warped to the project tempo (transients snap to the beat grid). */
+function WarpButton() {
+  const autoWarp = useSessionStore((s) => s.autoWarp);
+  const setAutoWarp = useSessionStore((s) => s.setAutoWarp);
+  const busy = useSessionStore((s) => s.warpBusy > 0);
+  const noAsk = useSessionStore((s) => s.warpPromptDisabled);
+  const setNoAsk = useSessionStore((s) => s.setWarpPromptDisabled);
+  const openMenu = useContextMenu();
+  return (
+    <button
+      className="studio-warp-btn"
+      type="button"
+      data-on={String(autoWarp)}
+      data-busy={String(busy)}
+      aria-pressed={autoWarp}
+      onClick={() => setAutoWarp(!autoWarp)}
+      onContextMenu={(e) =>
+        openMenu(e, [
+          { label: 'Auto-warp new audio', checked: autoWarp, onSelect: () => setAutoWarp(!autoWarp) },
+          { label: "Don't ask me about warping when it's off", checked: noAsk, onSelect: () => setNoAsk(!noAsk) },
+        ])
+      }
+      title={
+        autoWarp
+          ? 'Auto-warp is ON: new audio is stretched and snapped to the project tempo. Click to turn off.'
+          : 'Auto-warp is OFF: new audio drops in as it is (you will be asked). Click to turn on.'
+      }
+    >
+      <Magnet size={14} aria-hidden="true" />
+      <AudioWaveform size={14} aria-hidden="true" />
+      <span>{busy ? 'Warping…' : 'Warp'}</span>
+    </button>
+  );
+}
+
+/** Shows the connected MIDI controller, lets you pick one, and lights up when notes arrive. */
+function MidiPill() {
+  const status = useSessionStore((s) => s.midiStatus);
+  const inputs = useSessionStore((s) => s.midiInputs);
+  const chosen = useSessionStore((s) => s.midiInputId);
+  const setChosen = useSessionStore((s) => s.setMidiInputId);
+  const activity = useSessionStore((s) => s.midiActivity);
+  const [lit, setLit] = useState(false);
+  useEffect(() => {
+    if (!activity) return;
+    setLit(true);
+    const t = window.setTimeout(() => setLit(false), 140);
+    return () => window.clearTimeout(t);
+  }, [activity]);
+
+  if (status === 'unsupported') {
+    return <div className="studio-midi-pill" data-state="off" title="This browser has no Web MIDI. Use Chrome or Edge, or the desktop app."><span className="studio-status-dot" /><span>MIDI unavailable</span></div>;
+  }
+  if (status === 'denied') {
+    return <div className="studio-midi-pill" data-state="off" title="MIDI access was blocked. Allow it in the site settings, then reload."><span className="studio-status-dot" /><span>MIDI blocked</span></div>;
+  }
+  if (status === 'idle') {
+    return (
+      <button className="studio-midi-pill" data-state="off" type="button" onClick={() => void connectMidi()} title="Connect a MIDI keyboard or pad controller">
+        <span className="studio-status-dot" /><span>Connect MIDI</span>
+      </button>
+    );
+  }
+  return (
+    <div className="studio-midi-pill" data-state={inputs.length ? 'ok' : 'off'} data-lit={String(lit)} title={inputs.length ? 'Notes from this controller play and record on the selected instrument track' : 'No MIDI controller found. Plug one in.'}>
+      <span className="studio-status-dot" />
+      {inputs.length === 0 ? (
+        <span>No MIDI device</span>
+      ) : (
+        <select value={chosen} onChange={(e) => setChosen(e.target.value)} aria-label="MIDI input">
+          {inputs.length > 1 && <option value="all">All MIDI inputs</option>}
+          {inputs.map((i) => (
+            <option key={i.id} value={i.id}>{i.name}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
 export function TopBar() {
   const backupStatus = useSessionStore((s) => s.backupStatus);
   const cloudBackupStatus = useSessionStore((s) => s.cloudBackupStatus);
@@ -92,6 +174,8 @@ export function TopBar() {
       </div>
 
       <div className="studio-top-spacer" />
+      <WarpButton />
+      <MidiPill />
       <HueSlider />
 
       <StatusPill state={localPill} label="Saved on This Device" />

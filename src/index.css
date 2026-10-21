@@ -1355,3 +1355,21 @@
 .studio-roll-note { position: absolute; top: 1px; bottom: 1px; border-radius: 3px; background: linear-gradient(180deg, #c084fc, #7c3aed); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); cursor: pointer; z-index: 1; }
 .studio-roll-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: ew-resize; background: rgba(255, 255, 255, 0.25); border-radius: 0 3px 3px 0; }
 .studio-roll-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #f43f5e; pointer-events: none; z-index: 3; }
+
+/* Auto-warp button and prompt */
+.studio-warp-btn { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.4px; color: #a1a1aa; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: color 0.15s, background 0.15s, border-color 0.15s; }
+.studio-warp-btn:hover { color: #fff; border-color: rgba(168, 85, 247, 0.5); }
+.studio-warp-btn[data-on="true"] { color: #fff; background: linear-gradient(180deg, rgba(168, 85, 247, 0.42), rgba(124, 58, 237, 0.3)); border-color: rgba(192, 132, 252, 0.7); box-shadow: 0 0 14px rgba(168, 85, 247, 0.35); }
+.studio-warp-btn[data-busy="true"] svg { animation: warp-pulse 0.9s ease-in-out infinite; }
+@keyframes warp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.studio-toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 60; padding: 9px 16px; border-radius: 10px; font-size: 12.5px; color: #fff; background: rgba(24, 20, 34, 0.96); border: 1px solid rgba(168, 85, 247, 0.5); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); }
+
+/* MIDI controller pill */
+.studio-midi-pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px; border-radius: 999px; font-size: 11px; color: #a1a1aa; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); }
+button.studio-midi-pill { cursor: pointer; }
+button.studio-midi-pill:hover { color: #fff; border-color: rgba(168, 85, 247, 0.5); }
+.studio-midi-pill[data-state="ok"] { color: #d4d4d8; border-color: rgba(52, 211, 153, 0.4); }
+.studio-midi-pill[data-state="ok"] .studio-status-dot { background: #34d399; }
+.studio-midi-pill[data-lit="true"] .studio-status-dot { box-shadow: 0 0 10px 3px #34d399; background: #6ee7b7; }
+.studio-midi-pill select { background: transparent; color: inherit; border: 0; font-size: 11px; max-width: 150px; outline: none; }
+.studio-midi-pill select option { color: #000; }

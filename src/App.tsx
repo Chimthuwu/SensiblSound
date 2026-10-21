@@ -14,7 +14,9 @@ import { TopBar } from './components/studio/TopBar';
 import { TransportBar } from './components/studio/TransportBar';
 import { SampleBrowser } from './components/studio/SampleBrowser';
 import { MidiEditor } from './components/studio/MidiEditor';
+import { WarpUI } from './components/studio/WarpUI';
 import { startMidiEngine } from './midi/midiEngine';
+import { startMidiInput } from './midi/midiInput';
 
 function App() {
   const {
@@ -38,6 +40,8 @@ function App() {
 
   // MIDI playback scheduler: follows the transport.
   useEffect(() => startMidiEngine(), []);
+  // External MIDI controllers: notes play the selected instrument and record while a track is armed.
+  useEffect(() => startMidiInput(), []);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -121,6 +125,7 @@ function App() {
       )}
 
       <TopBar />
+      <WarpUI />
 
       {/* Headless: mounts the mic/recording engine and transport-synced
           playback for the backing track, active take and layers. */}

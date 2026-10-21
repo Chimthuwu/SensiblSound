@@ -463,6 +463,9 @@ export function useAudioRecorder() {
   // Handle Recording State Changes
   useEffect(() => {
     if (isRecording) {
+      // An armed instrument track records played notes (see midi/midiInput.ts), not the microphone.
+      const st = useSessionStore.getState();
+      if ((st.trackDevices[st.armedTrackId] ?? []).some((d) => d.type === 'synth' || d.type === 'drums')) return;
       startRecording();
     } else {
       stopRecording();

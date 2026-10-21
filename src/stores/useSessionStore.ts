@@ -3,6 +3,14 @@ import { DEFAULT_DRUMS, DEFAULT_EQ_BANDS, DEFAULT_SYNTH, DEVICE_FLAG, SYNTH_PRES
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
+// Small yes/no preferences kept in the browser. Storage can be blocked, so every access is guarded.
+function readFlag(key: string): boolean {
+  try { return localStorage.getItem(key) === '1'; } catch { return false; }
+}
+function writeFlag(key: string, on: boolean) {
+  try { localStorage.setItem(key, on ? '1' : '0'); } catch { /* the toggle still works for this visit */ }
+}
+
 export const useSessionStore = create<SessionState>((set) => ({
   bpm: 120,
   backingTrack: undefined,
@@ -224,6 +232,25 @@ export const useSessionStore = create<SessionState>((set) => ({
   }),
 
   extraTracks: [],
+
+  midiStatus: 'idle',
+  setMidiStatus: (midiStatus) => set({ midiStatus }),
+  midiInputs: [],
+  setMidiInputs: (midiInputs) => set({ midiInputs }),
+  midiInputId: 'all',
+  setMidiInputId: (midiInputId) => set({ midiInputId }),
+  midiActivity: 0,
+  bumpMidiActivity: () => set((state) => ({ midiActivity: state.midiActivity + 1 })),
+  autoWarp: readFlag('sensi-autowarp'),
+  setAutoWarp: (on) => { writeFlag('sensi-autowarp', on); set({ autoWarp: on }); },
+  warpPromptDisabled: readFlag('sensi-warp-noask'),
+  setWarpPromptDisabled: (off) => { writeFlag('sensi-warp-noask', off); set({ warpPromptDisabled: off }); },
+  warpPrompt: null,
+  setWarpPrompt: (warpPrompt) => set({ warpPrompt }),
+  warpBusy: 0,
+  setWarpBusy: (delta) => set((state) => ({ warpBusy: Math.max(0, state.warpBusy + delta) })),
+  toast: null,
+  showToast: (text) => set({ toast: { id: Date.now(), text } }),
 
   midiClips: [],
   instruments: {},
