@@ -1575,3 +1575,22 @@ input[data-driven="true"]::-webkit-slider-thumb { outline: 2px solid #fbbf24; ou
 .studio-topbar .studio-status { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .studio-topbar .studio-download-group, .studio-topbar .studio-midi-pill { flex: 0 1 auto; min-width: 0; }
 .studio-topbar .studio-top-spacer { flex: 1 1 0; min-width: 0; flex-shrink: 1; }
+
+/* The arrangement fills the free height of the column and scrolls inside it, tracks and timeline together.
+   (Cards used to shrink to fit and clip their tracks.) The track list pins to the left, the ruler to the top. */
+.studio > .studio-card { flex: none; }
+.studio > .studio-card[aria-label="Arrangement"] { display: flex; flex-direction: column; flex: 1 1 380px; min-height: 300px; }
+.studio-card[aria-label="Arrangement"] > .studio-daw { flex: 1 1 0; min-height: 0; overflow: auto; }
+.studio-timeline-col { overflow: visible; }
+.studio-row-heads { position: sticky; left: 0; z-index: 6; }
+.studio-corner { position: sticky; top: 0; z-index: 7; }
+.studio-ruler { position: sticky; top: 0; z-index: 5; }
+.studio-add-track { position: sticky; bottom: 0; z-index: 6; background: #17131f; }
+.studio-daw::-webkit-scrollbar { width: 10px; height: 10px; }
+.studio-daw::-webkit-scrollbar-track { background: #100d16; }
+.studio-daw::-webkit-scrollbar-thumb { background: #332c44; border-radius: 5px; }
+.studio-daw::-webkit-scrollbar-thumb:hover { background: #453a5c; }
+.studio-daw::-webkit-scrollbar-corner { background: #100d16; }
+
+/* The audio drop zone is a slim strip, not a block that eats the arrangement's height. */
+.studio-drop-zone { flex: none; min-height: 0; height: 34px; margin: 8px 14px 10px; font-size: 11px; }

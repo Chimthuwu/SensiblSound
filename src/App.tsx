@@ -19,6 +19,7 @@ import { Mixer } from './components/studio/Mixer';
 import { ModDrawer } from './components/studio/ModDrawer';
 import { laneInstrument, startMidiEngine } from './midi/midiEngine';
 import { startMidiInput } from './midi/midiInput';
+import { insertTrack } from './utils/tracks';
 import { startModEngine } from './mod/modEngine';
 
 /** True while the computer keyboard plays notes: a MIDI clip on a synth track is selected. */
@@ -71,6 +72,13 @@ function App() {
       // Don't trigger if user is typing in inputs or select elements
       const activeTag = document.activeElement?.tagName;
       if (activeTag === 'INPUT' || activeTag === 'SELECT' || activeTag === 'TEXTAREA') {
+        return;
+      }
+
+      // Ctrl+T (or Alt+T) inserts a track below the selected one. A plain browser tab keeps Ctrl+T for itself, so Alt+T always works.
+      if ((e.ctrlKey || e.metaKey || e.altKey) && !e.shiftKey && e.code === 'KeyT') {
+        e.preventDefault();
+        insertTrack(true);
         return;
       }
 

@@ -1,4 +1,5 @@
 import { Select } from './Select';
+import { insertTrack } from '../../utils/tracks';
 import { DEFAULT_TRACK_VOLUME } from '../../types';
 import { AutomationHead, AutomationLane, automationLaneOf } from './AutomationLane';
 import { Fragment, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
@@ -219,7 +220,7 @@ export function Arrangement() {
     if (!el || !isPlaying) return;
     const px = progress * totalW;
     const viewL = el.scrollLeft;
-    const viewR = viewL + el.clientWidth;
+    const viewR = viewL + el.clientWidth - 216; // the track list (216px) is pinned on the left
     if (px > viewR - 120) el.scrollLeft = px - 120;
     if (px < viewL) el.scrollLeft = Math.max(0, px - 40);
   }, [progress, isPlaying, totalW]);
@@ -683,7 +684,7 @@ export function Arrangement() {
         // Track and clip menus have already claimed the event; this is the fallback for the rest of the arranger.
         if (e.defaultPrevented) return;
         openMenu(e, [
-          { label: 'Insert Audio Track', onSelect: () => addTrack() },
+          { label: 'Insert Audio Track', onSelect: () => insertTrack(true) },
           ...(clipboard
             ? [{ label: 'Paste as New Track', onSelect: () => pasteAsNewTrack(transportTimeMs) }]
             : []),
@@ -750,7 +751,7 @@ export function Arrangement() {
         </div>
       </div>
 
-      <div className="studio-daw">
+      <div className="studio-daw" ref={tColRef}>
         <div className="studio-row-heads" ref={headsRef}>
           <div className="studio-corner">
             <span>Tracks</span>
@@ -992,14 +993,14 @@ export function Arrangement() {
           <button
             className="studio-add-track"
             type="button"
-            onClick={() => addTrack()}
+            onClick={() => insertTrack(false)}
             title="Add an empty audio track"
           >
             + Track
           </button>
         </div>
 
-        <div className="studio-timeline-col" ref={tColRef}>
+        <div className="studio-timeline-col">
           {/* At least as wide as the panel, so the grid fills the empty space to the right. */}
           <div className="studio-timeline-inner" style={{ width: totalW, minWidth: '100%' }}>
             <div
@@ -1170,7 +1171,7 @@ export function Arrangement() {
         onDrop={(e) => (hasSample(e) ? void dropSample(e, null) : dropAudio(e, null))}
         onContextMenu={(e) =>
           openMenu(e, [
-            { label: 'Insert Audio Track', onSelect: () => addTrack() },
+            { label: 'Insert Audio Track', onSelect: () => insertTrack(true) },
             ...(clipboard
               ? [{ label: 'Paste as new track', onSelect: () => pasteAsNewTrack(transportTimeMs) }]
               : []),
