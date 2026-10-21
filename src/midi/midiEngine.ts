@@ -1,6 +1,8 @@
 import { createMeterTap, masterIn, playbackContext } from '../utils/audioBus';
 import { useSessionStore } from '../stores/useSessionStore';
 import { DEFAULT_DRUMS, DEFAULT_SYNTH, isNoteFxDevice, type Instrument, type MidiClip, type MidiKind } from '../types';
+import { getEffective, isModulated, modNoteOff, modNoteOn, modNotePulse } from '../mod/modEngine';
+import { DRUM_SPECS, SYNTH_SPECS } from '../mod/params';
 import { audioFxKey, audioFxOf, buildLaneFx } from './laneFx';
 import { applyNoteFxChain, isNoteFx, NOTE_FX_DEFAULTS, type FxDevice, type FxNote } from './noteFx';
 import { playDrum, playSynthNote } from './instruments';
@@ -61,7 +63,7 @@ function syncChannels() {
   for (const id of liveIds) {
     const ch = channel(id);
     // Audio FX after the instrument: rebuilt only when a device or one of its settings changes.
-    const types = audioFxOf(s.trackDevices[id] ?? [], s.fxSettings);
+    const types = audioFxOf(s.trackDevices[id] ?? [], s.devicePower);
     const key = audioFxKey(types, s.fxSettings);
     if (key !== ch.fxKey) {
       ch.fxKey = key;
@@ -72,8 +74,8 @@ function syncChannels() {
       else ch.fxIn.connect(ch.fxOut);
     }
     const silent = s.disabledTracks.has(id) || s.mutedTracks.has(id) || (anySolo && !s.soloedTracks.has(id));
-    ch.gain.gain.value = silent ? 0 : (s.trackVolumes[id] ?? 1);
-    ch.pan.pan.value = s.trackPans[id] ?? 0;
+    ch.gain.gain.value = silent ? 0 : getEffective(`track:${id}:vol`, s.trackVolumes[id] ?? 1);
+    ch.pan.pan.value = getEffective(`track:${id}:pan`, s.trackPans[id] ?? 0);
   }
 }
 
@@ -82,7 +84,7 @@ const FALLBACK: Instrument = { synth: DEFAULT_SYNTH, drums: DEFAULT_DRUMS };
 /** The instrument that plays a lane: the first synth or drum machine in its device rack. No instrument, no sound. */
 export function laneInstrument(laneId: string): { kind: MidiKind; inst: Instrument } | null {
   const s = useSessionStore.getState();
-  const dev = (s.trackDevices[laneId] ?? []).find((d) => d.type === 'synth' || d.type === 'drums');
+  const dev = (s.trackDevices[laneId] ?? []).find((d) => (d.type === 'synth' || d.type === 'drums') && s.devicePower[d.uid] !== false);
   if (!dev) return null;
   return { kind: dev.type as MidiKind, inst: s.instruments[laneId] ?? FALLBACK };
 }
@@ -92,7 +94,7 @@ export function laneNoteFx(laneId: string): FxDevice[] {
   const s = useSessionStore.getState();
   const out: FxDevice[] = [];
   for (const d of s.trackDevices[laneId] ?? []) {
-    if (!isNoteFxDevice(d.type) || !isNoteFx(d.type)) continue;
+    if (!isNoteFxDevice(d.type) || !isNoteFx(d.type) || s.devicePower[d.uid] === false) continue;
     out.push({ type: d.type, params: { ...NOTE_FX_DEFAULTS[d.type], ...(s.midiFxParams[d.uid] ?? {}) } });
   }
   return out;
@@ -133,8 +135,24 @@ export function bakeMidiFx(clipId: string): string | null {
   return lane;
 }
 
-function playNote(laneId: string, rig: { kind: MidiKind; inst: Instrument }, pitch: number, vel: number, when: number, durS: number | null) {
+/** The instrument's settings with any modulation/automation applied, sampled as the note starts. */
+function modulatedInstrument(laneId: string, inst: Instrument): Instrument {
+  let synth = inst.synth, drums = inst.drums;
+  for (const key of Object.keys(SYNTH_SPECS) as (keyof typeof SYNTH_SPECS)[]) {
+    if (SYNTH_SPECS[key] && isModulated(`synth:${laneId}:${key}`)) synth = { ...synth, [key]: getEffective(`synth:${laneId}:${key}`, synth[key] as number) };
+  }
+  for (const key of Object.keys(DRUM_SPECS) as (keyof typeof DRUM_SPECS)[]) {
+    if (isModulated(`drums:${laneId}:${key}`)) drums = { ...drums, [key]: getEffective(`drums:${laneId}:${key}`, drums[key]) };
+  }
+  return synth === inst.synth && drums === inst.drums ? inst : { ...inst, synth, drums };
+}
+
+function playNote(laneId: string, rigIn: { kind: MidiKind; inst: Instrument }, pitch: number, vel: number, when: number, durS: number | null) {
+  const rig = { kind: rigIn.kind, inst: modulatedInstrument(laneId, rigIn.inst) };
   const ctx = playbackContext();
+  // Envelopes that follow the notes open while a note sounds.
+  const delayMs = Math.max(0, (when - ctx.currentTime) * 1000);
+  if (durS !== null) modNotePulse(delayMs, durS * 1000);
   const out = channel(laneId).gain;
   if (rig.kind === 'drums') {
     playDrum(ctx, out, rig.inst.drums, pitch, vel, when);
@@ -154,7 +172,10 @@ export function previewNote(trackId: string, pitch: number, vel = 0.8, hold = fa
   held.get(key)?.();
   const stop = playNote(trackId, rig, pitch, vel, ctx.currentTime + 0.005, hold ? null : durS);
   channel(trackId);
-  if (hold) held.set(key, () => { stop(); held.delete(key); });
+  if (hold) {
+    modNoteOn(); // envelopes that follow the notes stay open while the key is down
+    held.set(key, () => { stop(); modNoteOff(); held.delete(key); });
+  }
 }
 
 export function releaseNote(trackId: string, pitch: number) {

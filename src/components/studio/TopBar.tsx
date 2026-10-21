@@ -1,3 +1,4 @@
+import { Select } from './Select';
 import { useEffect, useRef, useState } from 'react';
 import { AudioWaveform, HardDrive, Magnet, Palette, Settings, Share2, SlidersVertical } from 'lucide-react';
 import { useContextMenu } from './ContextMenu';
@@ -185,12 +186,12 @@ function MidiPill() {
       {inputs.length === 0 ? (
         <span>No MIDI device</span>
       ) : (
-        <select value={chosen} onChange={(e) => setChosen(e.target.value)} aria-label="MIDI input">
+        <Select value={chosen} onChange={(e) => setChosen(e.target.value)} aria-label="MIDI input">
           {inputs.length > 1 && <option value="all">All MIDI inputs</option>}
           {inputs.map((i) => (
             <option key={i.id} value={i.id}>{i.name}</option>
           ))}
-        </select>
+        </Select>
       )}
     </div>
   );
@@ -211,6 +212,29 @@ function MixerToggle() {
     >
       <SlidersVertical size={14} aria-hidden="true" />
       <span>Mixer</span>
+    </button>
+  );
+}
+
+/** A sine wave: opens the global modulator section (LFOs, envelopes, automation) from the top of the page. */
+function ModToggle() {
+  const open = useSessionStore((s) => s.modDrawerOpen);
+  const setOpen = useSessionStore((s) => s.setModDrawerOpen);
+  const count = useSessionStore((s) => s.modulators.length + s.automation.length);
+  return (
+    <button
+      className="studio-warp-btn"
+      type="button"
+      data-on={String(open)}
+      aria-pressed={open}
+      aria-expanded={open}
+      onClick={() => setOpen(!open)}
+      title={open ? 'Hide the modulators' : 'Show the modulators: LFOs, envelopes and automation'}
+    >
+      <svg width="18" height="14" viewBox="0 0 18 14" fill="none" aria-hidden="true">
+        <path d="M1 7c2.2-8 3.8-8 6 0s3.8 8 6 0 2.2-3.4 4-3.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+      <span>Mod{count ? ` ${count}` : ''}</span>
     </button>
   );
 }
@@ -255,6 +279,7 @@ export function TopBar() {
       </div>
 
       <div className="studio-top-spacer" />
+      <ModToggle />
       <MixerToggle />
       <WarpButton />
       <MidiPill />

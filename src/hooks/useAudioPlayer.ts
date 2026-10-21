@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { useSessionStore } from '../stores/useSessionStore';
 import { createMeterTap, masterIn, playbackContext } from '../utils/audioBus';
+import { getEffective, isModulated, onModTick } from '../mod/modEngine';
 
 export interface AudioPlayerOptions {
   /** Project-time offset (in ms) at which this element should start being audible. */
@@ -62,6 +63,31 @@ export function useAudioPlayer(
     }
     panRef.current.panner.pan.value = options?.pan ?? 0;
   }, [isReady, url, options?.pan]);
+
+  // Modulation and automation of this track's volume and pan, applied straight to the audio as it moves.
+  const optsRef = useRef(options);
+  optsRef.current = options;
+  const modApplied = useRef({ vol: false, pan: false });
+  useEffect(() => {
+    const id = options?.meterId;
+    if (!id) return;
+    return onModTick(() => {
+      const o = optsRef.current;
+      const ws = wavesurfer.current;
+      const volId = `track:${id}:vol`;
+      const panId = `track:${id}:pan`;
+      const volMod = isModulated(volId);
+      if (ws && (volMod || modApplied.current.vol)) {
+        ws.setVolume(o?.forceMute ? 0 : getEffective(volId, o?.volume ?? 1));
+        modApplied.current.vol = volMod; // one last write puts the plain value back when modulation is removed
+      }
+      const panMod = isModulated(panId);
+      if (panRef.current && (panMod || modApplied.current.pan)) {
+        panRef.current.panner.pan.value = getEffective(panId, o?.pan ?? 0);
+        modApplied.current.pan = panMod;
+      }
+    });
+  }, [options?.meterId]);
 
   const interactive = options?.interactive ?? true;
 

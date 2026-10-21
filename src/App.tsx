@@ -16,8 +16,10 @@ import { SampleBrowser } from './components/studio/SampleBrowser';
 import { MidiEditor } from './components/studio/MidiEditor';
 import { WarpUI } from './components/studio/WarpUI';
 import { Mixer } from './components/studio/Mixer';
+import { ModDrawer } from './components/studio/ModDrawer';
 import { startMidiEngine } from './midi/midiEngine';
 import { startMidiInput } from './midi/midiInput';
+import { startModEngine } from './mod/modEngine';
 
 function App() {
   const viewMode = useSessionStore((s) => s.viewMode);
@@ -42,6 +44,9 @@ function App() {
 
   // MIDI playback scheduler: follows the transport.
   useEffect(() => startMidiEngine(), []);
+  // Modulators and automation: the clock that moves modulated parameters.
+  useEffect(() => startModEngine(), []);
+
   // External MIDI controllers: notes play the selected instrument and record while a track is armed.
   useEffect(() => startMidiInput(), []);
 
@@ -56,10 +61,11 @@ function App() {
 
       if (e.code === 'Space') {
         e.preventDefault();
-        setIsPlaying(!isPlaying);
+        useSessionStore.getState().togglePlay();
       } else if (e.code === 'KeyR') {
         e.preventDefault();
-        setIsRecording(!isRecording);
+        // R only arms recording; Play starts the transport (and records, when armed).
+        useSessionStore.getState().toggleRecordArm();
       } else if (e.code === 'Home') {
         // Rewind transport to the start of the project.
         e.preventDefault();
@@ -96,7 +102,7 @@ function App() {
   }, [activeTake, layers]);
 
   return (
-    <div className="min-h-screen bg-background text-zinc-200 flex flex-col font-sans">
+    <div className="h-full bg-background text-zinc-200 flex flex-col font-sans">
       {/* Tempo Detection Prompt Modal */}
       {showPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -127,6 +133,7 @@ function App() {
       )}
 
       <TopBar />
+      <ModDrawer />
       <WarpUI />
 
       {/* Headless: mounts the mic/recording engine and transport-synced

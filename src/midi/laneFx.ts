@@ -5,10 +5,9 @@ import type { DeviceId, FxSettings } from '../types';
 
 const AUDIO_FX: DeviceId[] = ['compressor', 'eq', 'delay', 'reverb'];
 
-/** Devices of a rack that process the instrument's audio, in rack order and only the ones switched on. */
-export function audioFxOf(devices: { type: DeviceId }[], fx: FxSettings): DeviceId[] {
-  const on: Record<string, boolean> = { compressor: fx.compressorEnabled, eq: fx.eqEnabled, delay: fx.delayEnabled, reverb: fx.reverbEnabled };
-  return devices.map((d) => d.type).filter((t) => AUDIO_FX.includes(t) && on[t]);
+/** Devices of a rack that process the instrument's audio, in rack order and only the ones powered on. */
+export function audioFxOf(devices: { uid: string; type: DeviceId }[], power: Record<string, boolean>): DeviceId[] {
+  return devices.filter((d) => AUDIO_FX.includes(d.type) && power[d.uid] !== false).map((d) => d.type);
 }
 
 /** Changes whenever the nodes would need rebuilding (a device came or went, or one of its settings moved). */

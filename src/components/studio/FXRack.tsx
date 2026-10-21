@@ -1,9 +1,10 @@
+import { Select } from './Select';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { ALL_DEVICES, deviceStage, isInstrumentDevice, isNoteFxDevice, type DeviceId, type DeviceStage } from '../../types';
 import { NoteFxPanel } from './NoteFxPanels';
-import { NOTE_FX_DEFAULTS, type NoteFxType } from '../../midi/noteFx';
+import type { NoteFxType } from '../../midi/noteFx';
 import { DrumPanel, SynthPanel } from './InstrumentPanels';
 import { Knob } from './Knob';
 import { useContextMenu, type MenuItem } from './ContextMenu';
@@ -33,57 +34,6 @@ const DEVICE_NAMES: Record<DeviceId, string> = {
   randomize: 'Randomize',
 };
 
-// Short label on each device's on/off switch.
-const DEVICE_SWITCH_LABEL: Record<DeviceId, string> = {
-  autotune: 'Tune',
-  doubler: 'Doub',
-  compressor: 'Comp',
-  eq: 'EQ',
-  delay: 'Delay',
-  reverb: 'Verb',
-  synth: 'On',
-  drums: 'On',
-  arp: 'On',
-  chord: 'On',
-  transpose: 'On',
-  noteFilter: 'On',
-  echo: 'On',
-  scale: 'On',
-  randomize: 'On',
-};
-
-function Switch({
-  checked,
-  onChange,
-  label,
-  compact,
-}: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-  compact?: boolean;
-}) {
-  return (
-    <label className="studio-switch-label">
-      <span>{label}</span>
-      <span
-        className={`studio-switch${compact ? ' studio-switch--sm' : ''}`}
-        data-on={String(checked)}
-        role="switch"
-        aria-checked={checked}
-        tabIndex={0}
-        onClick={() => onChange(!checked)}
-        onKeyDown={(e) => {
-          if (e.key === ' ' || e.key === 'Enter') {
-            e.preventDefault();
-            onChange(!checked);
-          }
-        }}
-      />
-    </label>
-  );
-}
-
 function MiniSelect({
   value,
   onChange,
@@ -97,13 +47,13 @@ function MiniSelect({
 }) {
   return (
     <div className="studio-mini-select">
-      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Select">
+      <Select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Select">
         {options.map((o) => (
           <option key={o} value={o}>
             {o}
           </option>
         ))}
-      </select>
+      </Select>
       {caret !== false && <span className="studio-caret">▾</span>}
     </div>
   );
@@ -147,13 +97,10 @@ function trackName(trackId: string, extraName?: string): string {
 
 export function FXRack() {
   const fxEnabled = useSessionStore((s) => s.fxEnabled);
-  const setFxEnabled = useSessionStore((s) => s.setFxEnabled);
   const fxSettings = useSessionStore((s) => s.fxSettings);
   const setFxSettings = useSessionStore((s) => s.setFxSettings);
   const selectedTrackId = useSessionStore((s) => s.selectedTrackId);
   const trackDevices = useSessionStore((s) => s.trackDevices);
-  const midiFxParams = useSessionStore((s) => s.midiFxParams);
-  const setMidiFxParam = useSessionStore((s) => s.setMidiFxParam);
   const extraTracks = useSessionStore((s) => s.extraTracks);
   const addDevice = useSessionStore((s) => s.addDevice);
   const removeDevice = useSessionStore((s) => s.removeDevice);
@@ -188,6 +135,47 @@ export function FXRack() {
   }, [browserAnchor]);
 
   const chain = trackDevices[selectedTrackId] ?? [];
+  const devicePower = useSessionStore((s) => s.devicePower);
+  const setDevicePower = useSessionStore((s) => s.setDevicePower);
+
+  // Selection: click a device to select it (Ctrl/Shift-click adds), Ctrl+A selects the whole rack.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const rackRef = useRef<HTMLElement>(null);
+  const rackActive = useRef(false);
+  useEffect(() => setSelected(new Set()), [selectedTrackId]);
+  const selectDevice = (e: React.MouseEvent, uid: string) => {
+    if ((e.target as HTMLElement).closest('button, input, .studio-knob, [role="combobox"], .studio-fx-grip')) return;
+    setSelected((prev) => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey) {
+        const next = new Set(prev);
+        if (next.has(uid)) next.delete(uid); else next.add(uid);
+        return next;
+      }
+      return new Set([uid]);
+    });
+  };
+  const chainRef = useRef(chain);
+  chainRef.current = chain;
+  useEffect(() => {
+    const doc = rackRef.current?.ownerDocument ?? document;
+    const onDown = (e: PointerEvent) => { rackActive.current = !!rackRef.current?.contains(e.target as Node); };
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('input, textarea, select')) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && rackActive.current) {
+        e.preventDefault();
+        setSelected(new Set(chainRef.current.map((d) => d.uid)));
+      } else if (e.key === 'Escape' && rackActive.current) setSelected(new Set());
+    };
+    doc.addEventListener('pointerdown', onDown, true);
+    doc.addEventListener('keydown', onKey);
+    return () => { doc.removeEventListener('pointerdown', onDown, true); doc.removeEventListener('keydown', onKey); };
+  }, []);
+  /** One device, or every selected device when this one is part of a multi-selection. */
+  const togglePower = (uid: string) => {
+    const targets = selected.has(uid) && selected.size > 1 ? [...selected] : [uid];
+    setDevicePower(targets, devicePower[uid] === false);
+  };
 
   const setEqBand = useSessionStore((s) => s.setEqBand);
 
@@ -378,38 +366,9 @@ export function FXRack() {
     }
   };
 
-  const flagFor: Record<DeviceId, boolean> = {
-    autotune: fxSettings.autotuneEnabled,
-    doubler: fxSettings.doubleEnabled,
-    compressor: fxSettings.compressorEnabled,
-    eq: fxSettings.eqEnabled,
-    delay: fxSettings.delayEnabled,
-    reverb: fxSettings.reverbEnabled,
-    synth: true,
-    drums: true,
-    arp: true,
-    chord: true,
-    transpose: true,
-    noteFilter: true,
-    echo: true,
-    scale: true,
-    randomize: true,
-  };
-  const setFlag = (device: DeviceId, on: boolean) => {
-    const key = {
-      autotune: 'autotuneEnabled',
-      doubler: 'doubleEnabled',
-      compressor: 'compressorEnabled',
-      eq: 'eqEnabled',
-      delay: 'delayEnabled',
-      reverb: 'reverbEnabled',
-    } as const;
-    if (isInstrumentDevice(device) || isNoteFxDevice(device)) return;
-    setFxSettings({ [key[device as keyof typeof key]]: on });
-  };
-
   return (
     <section
+      ref={rackRef}
       className="studio-card"
       aria-label="Devices"
       onContextMenu={(e) => {
@@ -430,13 +389,12 @@ export function FXRack() {
         <h2 className="studio-card-head-title">Devices</h2>
         <span className="studio-tag">{trackName(selectedTrackId, extraTracks.find((t) => t.id === selectedTrackId)?.name)}</span>
         <div className="studio-head-spacer" />
-        <Switch checked={fxEnabled} onChange={setFxEnabled} label="Enable Effects" />
+        <span className="mod-hint">Click a device to select it · Ctrl+A selects all · a power button switches every selected device</span>
       </div>
 
       <div
         ref={stripRef}
         className="studio-fx-grid"
-        data-disabled={String(!fxEnabled && !chain.some((d) => isInstrumentDevice(d.type)))}
         onContextMenu={(e) => openMenu(e, addDeviceItems())}
       >
           {chain.map((instance, index) => {
@@ -456,7 +414,9 @@ export function FXRack() {
             <div
               className="studio-fx-module"
               data-device-index={index}
-              data-off={String(isNoteFxDevice(device) ? (midiFxParams[instance.uid]?.on ?? 1) === 0 : !isInstrumentDevice(device) && !flagFor[device])}
+              data-off={String(devicePower[instance.uid] === false)}
+              data-selected={String(selected.has(instance.uid))}
+              onClick={(e) => selectDevice(e, instance.uid)}
               data-stage={deviceStage(device)}
               data-instrument={String(isInstrumentDevice(device))}
               onContextMenu={(e) => {
@@ -507,21 +467,19 @@ export function FXRack() {
                   {DEVICE_NAMES[device]}
                   {copyCount > 1 ? ` ${copyNumber}` : ''}
                 </span>
-                {isNoteFxDevice(device) ? (
-                  <Switch
-                    compact
-                    checked={(midiFxParams[instance.uid]?.on ?? NOTE_FX_DEFAULTS[device as NoteFxType].on) !== 0}
-                    onChange={(v) => setMidiFxParam(instance.uid, { on: v ? 1 : 0 })}
-                    label={DEVICE_SWITCH_LABEL[device]}
-                  />
-                ) : !isInstrumentDevice(device) && (
-                  <Switch
-                    compact
-                    checked={flagFor[device]}
-                    onChange={(v) => setFlag(device, v)}
-                    label={DEVICE_SWITCH_LABEL[device]}
-                  />
-                )}
+                <button
+                  className="studio-fx-power"
+                  type="button"
+                  data-on={String(devicePower[instance.uid] !== false)}
+                  aria-pressed={devicePower[instance.uid] !== false}
+                  aria-label={`Power ${DEVICE_NAMES[device]}`}
+                  title={selected.has(instance.uid) && selected.size > 1 ? `Power: switches all ${selected.size} selected devices` : 'Power on / off'}
+                  onClick={(e) => { e.stopPropagation(); togglePower(instance.uid); }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 3v8M6.3 6.8a8 8 0 1011.4 0" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                  </svg>
+                </button>
                 <button
                   className="studio-mini-btn"
                   type="button"

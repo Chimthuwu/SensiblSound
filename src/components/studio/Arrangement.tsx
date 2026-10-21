@@ -1,3 +1,4 @@
+import { Select } from './Select';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Activity } from 'lucide-react';
 import { useSessionStore } from '../../stores/useSessionStore';
@@ -8,6 +9,7 @@ import { ClipWaveform } from './ClipWaveform';
 import { MidiClipPreview } from './MidiClipPreview';
 import { onAudioAdded, warpLane } from '../../utils/warpActions';
 import { panFill, volumeFill } from '../../utils/sliderFill';
+import { buildParamMenu } from '../../mod/paramMenu';
 import { bakeMidiFx, laneNoteFx, processedNotes } from '../../midi/midiEngine';
 import { encodeMidiFile } from '../../midi/smf';
 import type { MidiNote } from '../../types';
@@ -342,6 +344,46 @@ export function Arrangement() {
     return beat * (msPerBar / 4);
   };
 
+  const timeSelection = useSessionStore((s) => s.timeSelection);
+  const setTimeSelection = useSessionStore((s) => s.setTimeSelection);
+  const loop = useSessionStore((s) => s.loop);
+  const setLoop = useSessionStore((s) => s.setLoop);
+  const setTransportTimeMs = useSessionStore((s) => s.setTransportTimeMs);
+  const selDrag = useRef<{ startMs: number; moved: boolean } | null>(null);
+
+  /** Time under the pointer, in ms, snapped to a quarter beat. `el` is the ruler or lane (both start at the timeline's left edge). */
+  const snapMsAt = (clientX: number, el: Element) => {
+    const r = el.getBoundingClientRect();
+    const beats = Math.max(0, (clientX - r.left) / BEAT_W);
+    return Math.round(beats * 4) / 4 * (msPerBar / 4);
+  };
+  const beginSelect = (e: React.PointerEvent, isRuler: boolean) => {
+    if (e.button !== 0) return;
+    if (!isRuler && (e.target as HTMLElement).closest('.studio-clip')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    selDrag.current = { startMs: snapMsAt(e.clientX, e.currentTarget), moved: false };
+  };
+  const moveSelect = (e: React.PointerEvent) => {
+    const d = selDrag.current;
+    if (!d) return;
+    const ms = snapMsAt(e.clientX, e.currentTarget);
+    if (!d.moved && Math.abs(ms - d.startMs) < msPerBar / 4) return;
+    d.moved = true;
+    setTimeSelection({ startMs: Math.min(d.startMs, ms), endMs: Math.max(d.startMs, ms) });
+  };
+  const endSelect = (e: React.PointerEvent, isRuler: boolean) => {
+    const d = selDrag.current;
+    selDrag.current = null;
+    if (!d || d.moved) return;
+    // A plain click clears the selection; on the ruler it also moves the playhead there.
+    setTimeSelection(null);
+    if (isRuler) setTransportTimeMs(snapMsAt(e.clientX, e.currentTarget));
+  };
+
+  const modMappings = useSessionStore((s) => s.modMappings);
+  const automation = useSessionStore((s) => s.automation);
+  const isDriven = (paramId: string) => automation.some((a) => a.paramId === paramId) || modMappings.some((m) => m.paramId === paramId);
+
   const laneMenuItems = (laneId: string, atMs?: number): MenuItem[] => {
     const lane = laneOf(laneId);
     const hasClip = !!lane && lane.clips.some((c) => !c.midi);
@@ -565,8 +607,18 @@ export function Arrangement() {
       void transformSelected({ reverse: true });
       return;
     }
+    if (e.key === 'Escape' && timeSelection) { setTimeSelection(null); return; }
     if (!(e.ctrlKey || e.metaKey)) return;
     const k = e.key.toLowerCase();
+    if (k === 'l') {
+      // Loop the highlighted time (or the selected clip). With nothing selected it switches the loop on or off.
+      e.preventDefault();
+      const clipRange = clip ? { startMs: (clip.startBar - 1) * msPerBar, endMs: (clip.startBar - 1 + clip.lenBars) * msPerBar } : null;
+      const range = timeSelection ?? clipRange;
+      if (range && range.endMs > range.startMs) setLoop({ startMs: range.startMs, endMs: range.endMs, enabled: true });
+      else useSessionStore.getState().toggleLoop();
+      return;
+    }
     if (k === 'd' && clip?.midi && sel) {
       e.preventDefault();
       const mc = midiClips.find((m) => m.id === clip.id);
@@ -795,6 +847,8 @@ export function Arrangement() {
                     onChange={(e) => setTrackVolume(lane.id, Number(e.target.value) / 100)}
                     onClick={(e) => e.stopPropagation()}
                     style={{ background: volumeFill(trackVolumes[lane.id] ?? 1) }}
+                    data-driven={String(isDriven(`track:${lane.id}:vol`))}
+                    onContextMenu={(e) => { e.stopPropagation(); openMenu(e, buildParamMenu(`track:${lane.id}:vol`)); }}
                     aria-label={`${lane.name} volume`}
                     title={`Volume ${Math.round((trackVolumes[lane.id] ?? 1) * 100)}%`}
                   />
@@ -808,6 +862,8 @@ export function Arrangement() {
                     onDoubleClick={() => setTrackPan(lane.id, 0)}
                     onClick={(e) => e.stopPropagation()}
                     style={{ background: panFill(trackPans[lane.id] ?? 0) }}
+                    data-driven={String(isDriven(`track:${lane.id}:pan`))}
+                    onContextMenu={(e) => { e.stopPropagation(); openMenu(e, buildParamMenu(`track:${lane.id}:pan`)); }}
                     aria-label={`${lane.name} pan`}
                     title={`Pan ${Math.round((trackPans[lane.id] ?? 0) * 100)} (double-click to centre)`}
                   />
@@ -855,7 +911,7 @@ export function Arrangement() {
                     </button>
                   )}
                   {!isLayerLane(lane.id) && (
-                    <select
+                    <Select
                       className="studio-mini-btn"
                       value={selectedMicId}
                       disabled={isRecording || !micReady}
@@ -871,7 +927,7 @@ export function Arrangement() {
                           {d.label || `Microphone ${i + 1}`}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   )}
                   {isLayerLane(lane.id) && (
                     <button
@@ -916,8 +972,16 @@ export function Arrangement() {
         <div className="studio-timeline-col" ref={tColRef}>
           {/* At least as wide as the panel, so the grid fills the empty space to the right. */}
           <div className="studio-timeline-inner" style={{ width: totalW, minWidth: '100%' }}>
-            <div className="studio-ruler">
-              <div className="studio-ruler-loop" style={{ left: 0, width: totalW }} />
+            <div
+              className="studio-ruler"
+              onPointerDown={(e) => beginSelect(e, true)}
+              onPointerMove={moveSelect}
+              onPointerUp={(e) => endSelect(e, true)}
+              onPointerCancel={() => { selDrag.current = null; }}
+              title="Click to move the playhead. Drag to highlight time, then Ctrl+L to loop it."
+            >
+              {loop && <div className="studio-ruler-loop" data-on={String(loop.enabled)} style={{ left: (loop.startMs / msPerBar) * BAR_W, width: ((loop.endMs - loop.startMs) / msPerBar) * BAR_W }} />}
+              {timeSelection && <div className="studio-ruler-sel" style={{ left: (timeSelection.startMs / msPerBar) * BAR_W, width: ((timeSelection.endMs - timeSelection.startMs) / msPerBar) * BAR_W }} />}
               {Array.from({ length: bars }).map((_, b) => (
                 <div key={b} className="studio-tick" data-major="true" style={{ left: b * BAR_W }}>
                   <span className="studio-tick-label">{b + 1}</span>
@@ -936,6 +1000,8 @@ export function Arrangement() {
             </div>
 
             <div className="studio-lanes">
+              {loop?.enabled && <div className="studio-loop-shade" style={{ left: (loop.startMs / msPerBar) * BAR_W, width: ((loop.endMs - loop.startMs) / msPerBar) * BAR_W }} aria-hidden="true" />}
+              {timeSelection && <div className="studio-tsel" style={{ left: (timeSelection.startMs / msPerBar) * BAR_W, width: ((timeSelection.endMs - timeSelection.startMs) / msPerBar) * BAR_W }} aria-hidden="true" />}
               {orderedLanes.map((lane, i) => (
                 <div
                   key={lane.id}
@@ -945,6 +1011,10 @@ export function Arrangement() {
                   data-muted={String(mutedTracks.has(lane.id))}
                   data-disabled={String(disabledTracks.has(lane.id))}
                   onContextMenu={(e) => openMenu(e, laneMenuItems(lane.id, msUnder(e)))}
+                  onPointerDown={(e) => beginSelect(e, false)}
+                  onPointerMove={moveSelect}
+                  onPointerUp={(e) => endSelect(e, false)}
+                  onPointerCancel={() => { selDrag.current = null; }}
                   onDoubleClick={(e) => {
                     // Double-click empty space on any track: a MIDI clip starts there.
                     if ((e.target as HTMLElement).closest('.studio-clip')) return;

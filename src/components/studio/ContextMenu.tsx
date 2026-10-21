@@ -63,7 +63,9 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setMenu(null);
     };
-    const close = () => setMenu(null);
+    // Focusing the clicked control can nudge a scroll container just after the menu opens; that must not close it.
+    const openedAt = performance.now();
+    const close = () => { if (performance.now() - openedAt > 300) setMenu(null); };
     window.addEventListener('pointerdown', onDown);
     window.addEventListener('keydown', onKey);
     window.addEventListener('resize', close);

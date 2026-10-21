@@ -1,4 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { useContextMenu } from './ContextMenu';
+import { buildParamMenu } from '../../mod/paramMenu';
+import { useIsDriven, useModLive } from '../../mod/useModLive';
 
 const A_MIN = -135;
 const A_MAX = 135;
@@ -26,6 +29,8 @@ export interface KnobProps {
   formatValue?: (value: number) => string;
   onChange: (value: number) => void;
   size?: number;
+  /** Makes the knob automatable and modulatable: right-click offers it, and a dot shows the modulated value. */
+  paramId?: string;
 }
 
 export function Knob({
@@ -36,7 +41,11 @@ export function Knob({
   default: defaultVal = min + (max - min) / 2,
   onChange,
   size = 46,
+  paramId,
 }: KnobProps) {
+  const openMenu = useContextMenu();
+  const driven = useIsDriven(paramId);
+  const live = useModLive(paramId);
   const svgRef = useRef<SVGSVGElement>(null);
   const [local, setLocal] = useState(value);
   const drag = useRef<{ startY: number; startV: number } | null>(null);
@@ -112,6 +121,8 @@ export function Knob({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onDoubleClick={onDoubleClick}
+      onContextMenu={paramId ? (e) => { e.stopPropagation(); openMenu(e, buildParamMenu(paramId)); } : undefined}
+      data-driven={driven ? 'true' : undefined}
       aria-label="Knob"
       tabIndex={0}
     >
@@ -138,6 +149,10 @@ export function Knob({
           strokeLinecap="round"
           style={{ color: '#b06bff' }}
         />
+        {live !== null && (() => {
+          const [mx, my] = polarDegrees(cx, cy, r, A_MIN + live * (A_MAX - A_MIN));
+          return <circle className="studio-knob-mod" cx={mx} cy={my} r={size * 0.075} fill="#fbbf24" stroke="#14101c" strokeWidth={1} />;
+        })()}
         <circle cx={cx} cy={cy} r={size * 0.25} fill="#1d1828" stroke="#322a42" strokeWidth={1} />
         <line
           className="studio-knob-ind"

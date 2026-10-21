@@ -44,11 +44,21 @@ export function useTimer() {
       const expected = baseMsRef.current + (now - baseTimeRef.current);
       const actual = useSessionStore.getState().transportTimeMs;
 
+      // Looping: on reaching the end of the loop, jump back to its start and carry on from there.
+      const lp = useSessionStore.getState().loop;
+      if (lp?.enabled && useSessionStore.getState().isPlaying && expected >= lp.endMs && lp.endMs > lp.startMs) {
+        baseMsRef.current = lp.startMs;
+        baseTimeRef.current = now;
+        useSessionStore.getState().setTransportTimeMs(lp.startMs);
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
       // Playback ends a moment after the last clip, audio or MIDI, on any track (never while recording).
       const st = useSessionStore.getState();
       if (st.isPlaying && !st.isRecording) {
         const end = contentEndMs(st);
-        if (end > 0 && actual > end + 1500) st.setIsPlaying(false);
+        if (end > 0 && actual > end + 1500 && !st.loop?.enabled) st.setIsPlaying(false);
       }
 
       if (Math.abs(expected - actual) > 50) {

@@ -10,9 +10,12 @@ export function TransportBar() {
   const metronomeVolume = useSessionStore((s) => s.metronomeVolume);
   const setIsMetronomeEnabled = useSessionStore((s) => s.setIsMetronomeEnabled);
   const setMetronomeVolume = useSessionStore((s) => s.setMetronomeVolume);
-  const setIsPlaying = useSessionStore((s) => s.setIsPlaying);
-  const setIsRecording = useSessionStore((s) => s.setIsRecording);
+  const togglePlay = useSessionStore((s) => s.togglePlay);
+  const recordArmed = useSessionStore((s) => s.recordArmed);
+  const toggleRecordArm = useSessionStore((s) => s.toggleRecordArm);
   const rewindTransport = useSessionStore((s) => s.rewindTransport);
+  const loop = useSessionStore((s) => s.loop);
+  const timeSelection = useSessionStore((s) => s.timeSelection);
 
   const totalSec = (transportTimeMs ?? 0) / 1000;
   const m = Math.floor(totalSec / 60);
@@ -85,7 +88,7 @@ export function TransportBar() {
         </button>
         <button
           className={`studio-tp-btn ${isPlaying ? 'studio-tp-btn-primary' : ''}`}
-          onClick={() => setIsPlaying(!isPlaying)}
+          onClick={() => togglePlay()}
           title="Play / Stop (Space)"
           type="button"
           aria-label={isPlaying ? 'Stop' : 'Play'}
@@ -104,16 +107,35 @@ export function TransportBar() {
         <button
           className="studio-tp-rec"
           data-recording={String(isRecording)}
-          onClick={() => setIsRecording(!isRecording)}
-          title="Record (R)"
+          data-armed={String(recordArmed)}
+          onClick={() => toggleRecordArm()}
+          title={recordArmed ? 'Recording is armed: press Play to record (R to disarm)' : 'Arm recording (R). Play then starts recording'}
           type="button"
-          aria-label={isRecording ? 'Stop recording' : 'Record'}
+          aria-pressed={recordArmed}
+          aria-label={recordArmed ? 'Disarm recording' : 'Arm recording'}
         >
           <span data-rec-indicator></span>
         </button>
       </div>
 
       <div className="studio-tp-side" data-align="end">
+        <button
+          className="studio-tp-btn studio-loop-btn"
+          type="button"
+          data-on={String(!!loop?.enabled)}
+          aria-pressed={!!loop?.enabled}
+          onClick={() => {
+            const st = useSessionStore.getState();
+            if (st.loop) st.toggleLoop();
+            else if (st.timeSelection) st.setLoop({ ...st.timeSelection, enabled: true });
+            else st.showToast('Drag across the timeline to highlight a section, then press Ctrl+L to loop it.');
+          }}
+          title={loop ? (loop.enabled ? 'Looping. Click to switch the loop off (Ctrl+L)' : 'Loop is off. Click to switch it on (Ctrl+L)') : timeSelection ? 'Loop the highlighted time (Ctrl+L)' : 'Highlight a section of the timeline, then Ctrl+L'}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M17 2l3 3-3 3M7 22l-3-3 3-3M4 12V10a4 4 0 014-4h12M20 12v2a4 4 0 01-4 4H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
         <div className="studio-tc-wrap">
           <span className="studio-tp-label">Timecode</span>
           <span className="studio-timecode">{timecode}</span>

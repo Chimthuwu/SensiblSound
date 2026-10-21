@@ -1,3 +1,5 @@
+import type { AutoPoint, Automation, ModMapping, Modulator } from '../mod/modCore';
+
 export interface AudioFile {
   id: string;
   name: string;
@@ -236,6 +238,42 @@ export interface SessionState {
   trackOrder: string[];
   setTrackOrder: (ids: string[]) => void;
   toggleSoloTrack: (trackId: string) => void;
+
+  /** The highlighted stretch of the timeline (drag on the ruler or an empty part of a track). Ctrl+L loops it. */
+  timeSelection: { startMs: number; endMs: number } | null;
+  setTimeSelection: (s: { startMs: number; endMs: number } | null) => void;
+  /** The loop: while enabled, playback jumps back to startMs on reaching endMs. */
+  loop: { startMs: number; endMs: number; enabled: boolean } | null;
+  setLoop: (l: { startMs: number; endMs: number; enabled: boolean } | null) => void;
+  toggleLoop: () => void;
+
+  /** Power of each device instance (missing = on). Every device in a rack has its own power button. */
+  devicePower: Record<string, boolean>;
+  setDevicePower: (uids: string[], on: boolean) => void;
+
+  /** Recording is armed: the next Play also records. R toggles it; it never starts the transport by itself. */
+  recordArmed: boolean;
+  toggleRecordArm: () => void;
+  /** Space / the play button: stops everything if anything is running, else plays (and records if armed). */
+  togglePlay: () => void;
+
+  // Global modulators (LFOs, envelopes), what they are mapped to, and automation curves.
+  modulators: Modulator[];
+  modMappings: ModMapping[];
+  automation: Automation[];
+  modDrawerOpen: boolean;
+  setModDrawerOpen: (open: boolean) => void;
+  modTab: 'mods' | 'auto';
+  setModTab: (tab: 'mods' | 'auto') => void;
+  addModulator: (kind: 'lfo' | 'adsr') => string;
+  updateModulator: (id: string, patch: Partial<Modulator>) => void;
+  removeModulator: (id: string) => void;
+  /** Maps a modulator to a parameter (creates it, or changes its amount). */
+  setMapping: (modId: string, paramId: string, amount: number) => void;
+  removeMapping: (id: string) => void;
+  addAutomation: (paramId: string, points: AutoPoint[]) => void;
+  setAutomationPoints: (paramId: string, points: AutoPoint[]) => void;
+  removeAutomation: (paramId: string) => void;
 
   /** What MIDI recording stores: the notes as played, or what comes out of the track's MIDI FX (the instrument's input). */
   midiRecordSource: 'played' | 'output';

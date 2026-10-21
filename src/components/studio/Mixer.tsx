@@ -3,6 +3,9 @@ import { useSessionStore } from '../../stores/useSessionStore';
 import { laneInfos, type LaneInfo } from '../../utils/lanes';
 import { readLevel } from '../../utils/audioBus';
 import { panFill } from '../../utils/sliderFill';
+import { buildParamMenu } from '../../mod/paramMenu';
+import { useContextMenu } from './ContextMenu';
+import { useIsDriven } from '../../mod/useModLive';
 import type { DeviceId } from '../../types';
 
 const DEVICE_SHORT: Record<DeviceId, string> = {
@@ -46,6 +49,11 @@ function Strip({
   const setArmed = useSessionStore((s) => s.setArmedTrackId);
   const select = useSessionStore((s) => s.setSelectedTrackId);
 
+  const openMenu = useContextMenu();
+  const volId = master ? 'master:vol' : `track:${id}:vol`;
+  const panId = `track:${id}:pan`;
+  const volDriven = useIsDriven(volId);
+  const panDriven = useIsDriven(panId);
   const refs = useRef<MeterRefs>({ l: null, r: null, hold: null, clip: null });
   useEffect(() => {
     meters.current.set(id, refs.current);
@@ -83,6 +91,8 @@ function Strip({
               onDoubleClick={() => setPan(id, 0)}
               onClick={(e) => e.stopPropagation()}
               style={{ background: panFill(pan) }}
+              data-driven={String(panDriven)}
+              onContextMenu={(e) => { e.stopPropagation(); openMenu(e, buildParamMenu(panId)); }}
               aria-label={`${name} pan`} title="Pan (double-click to centre)"
             />
             <span className="mx-pan-val">{Math.abs(pan) < 0.02 ? 'C' : pan < 0 ? `${Math.round(-pan * 100)}L` : `${Math.round(pan * 100)}R`}</span>
@@ -101,7 +111,9 @@ function Strip({
           onChange={(e) => setVolume(toGain(Number(e.target.value) / 1000))}
           onDoubleClick={() => setVolume(1)}
           onClick={(e) => e.stopPropagation()}
-          aria-label={`${name} volume`} title="Volume (double-click for 0 dB)"
+          data-driven={String(volDriven)}
+          onContextMenu={(e) => { e.stopPropagation(); openMenu(e, buildParamMenu(volId)); }}
+          aria-label={`${name} volume`} title="Volume (double-click for 0 dB, right-click to automate or modulate)"
         />
         <div className="mx-meter" aria-hidden="true">
           {(['l', 'r'] as const).map((ch) => (

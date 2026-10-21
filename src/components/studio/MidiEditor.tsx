@@ -1,3 +1,4 @@
+import { Select } from './Select';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSessionStore } from '../../stores/useSessionStore';
@@ -105,8 +106,8 @@ export function MidiEditor() {
       const t = e.target as HTMLElement | null;
       if (t?.closest?.('input, textarea, select, [contenteditable="true"]') || e.ctrlKey || e.metaKey || e.altKey) return;
       const st = useSessionStore.getState();
-      if (e.code === 'Space') { e.preventDefault(); st.setIsPlaying(!st.isPlaying); }
-      else if (e.code === 'KeyR') { e.preventDefault(); st.setIsRecording(!st.isRecording); }
+      if (e.code === 'Space') { e.preventDefault(); st.togglePlay(); }
+      else if (e.code === 'KeyR') { e.preventDefault(); st.toggleRecordArm(); }
       else if (e.code === 'Home') { e.preventDefault(); st.rewindTransport(); }
     };
     const wins: Window[] = pop ? [window, pop.win] : [window];
@@ -227,7 +228,7 @@ export function MidiEditor() {
             </>
           )}
           {kind === 'drums' && <span className="studio-tag">Pads on A S D F G H J K</span>}
-          <select
+          <Select
             className="studio-mini-btn"
             value={recordSource}
             onChange={(e) => setRecordSource(e.target.value as 'played' | 'output')}
@@ -236,7 +237,7 @@ export function MidiEditor() {
           >
             <option value="played">Record: played notes</option>
             <option value="output">Record: MIDI FX output</option>
-          </select>
+          </Select>
           <button
             className="studio-mini-btn"
             type="button"
@@ -255,7 +256,7 @@ export function MidiEditor() {
           >
             Export .mid
           </button>
-          <select
+          <Select
             className="studio-mini-btn"
             value={clip.bars}
             onChange={(e) => updateMidiClip(clip.id, { bars: Number(e.target.value) })}
@@ -265,7 +266,7 @@ export function MidiEditor() {
             {[1, 2, 4, 8].map((b) => (
               <option key={b} value={b}>{b} bar{b === 1 ? '' : 's'}</option>
             ))}
-          </select>
+          </Select>
           <button className="studio-mini-btn" type="button" onClick={() => setMidiNotes(clip.id, [])} disabled={clip.notes.length === 0}>Clear</button>
         </div>
       </div>

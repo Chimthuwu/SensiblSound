@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { DEFAULT_DRUMS, DEFAULT_EQ_BANDS, DEFAULT_SYNTH, DEVICE_FLAG, makeDeviceInstance, isInstrumentDevice, stageRank, type DeviceInstance, type ExtraTrack, type MidiClip, type SessionState } from '../types';
+import type { Modulator } from '../mod/modCore';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
@@ -28,7 +29,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   // could only ever fail.
   driveConnection: isDriveConfigured ? 'disconnected' : 'unavailable',
   isMonitoring: true,
-  fxEnabled: false,
+  fxEnabled: true, // there is no master effects switch any more: each device has its own power button
   transportTimeMs: 0,
   // Seeded synchronously from localStorage on store creation — this is
   // what makes recordings recoverable after a refresh even though
@@ -233,6 +234,72 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   extraTracks: [],
 
+  timeSelection: null,
+  setTimeSelection: (timeSelection) => set({ timeSelection }),
+  loop: null,
+  setLoop: (loop) => set({ loop }),
+  toggleLoop: () => set((state) => (state.loop ? { loop: { ...state.loop, enabled: !state.loop.enabled } } : {})),
+  devicePower: {},
+  setDevicePower: (uids, on) => set((state) => {
+    const devicePower = { ...state.devicePower };
+    for (const u of uids) devicePower[u] = on;
+    // The microphone chain is switched per effect type: a type runs while any of its devices anywhere is on.
+    const fxSettings = { ...state.fxSettings };
+    for (const type of Object.keys(DEVICE_FLAG) as (keyof typeof DEVICE_FLAG)[]) {
+      const flag = DEVICE_FLAG[type];
+      if (!flag) continue;
+      const anyOn = Object.values(state.trackDevices).some((list) => list.some((d) => d.type === type && devicePower[d.uid] !== false));
+      (fxSettings as Record<string, unknown>)[flag] = anyOn;
+    }
+    return { devicePower, fxSettings };
+  }),
+  recordArmed: false,
+  toggleRecordArm: () => set((state) => (state.recordArmed ? { recordArmed: false, isRecording: false } : { recordArmed: true })),
+  togglePlay: () => set((state) => (state.isPlaying || state.isRecording
+    ? { isPlaying: false, isRecording: false }
+    : { isPlaying: true, isRecording: state.recordArmed })),
+  modulators: [],
+  modMappings: [],
+  automation: [],
+  modDrawerOpen: false,
+  setModDrawerOpen: (modDrawerOpen) => set({ modDrawerOpen }),
+  modTab: 'mods',
+  setModTab: (modTab) => set({ modTab }),
+  addModulator: (kind) => {
+    const id = crypto.randomUUID();
+    set((state) => {
+      const n = state.modulators.filter((m) => m.kind === kind).length + 1;
+      const mod: Modulator = kind === 'lfo'
+        ? { id, kind: 'lfo', name: 'LFO ' + n, shape: 'sine', rate: 1, sync: false, division: 4 }
+        : { id, kind: 'adsr', name: 'Envelope ' + n, attack: 0.2, decay: 0.4, sustain: 0.6, release: 0.6, gate: 'transport' };
+      return { modulators: [...state.modulators, mod] };
+    });
+    return id;
+  },
+  updateModulator: (id, patch) => set((state) => ({
+    modulators: state.modulators.map((m) => (m.id === id ? ({ ...m, ...patch } as Modulator) : m)),
+  })),
+  removeModulator: (id) => set((state) => ({
+    modulators: state.modulators.filter((m) => m.id !== id),
+    modMappings: state.modMappings.filter((x) => x.modId !== id),
+  })),
+  setMapping: (modId, paramId, amount) => set((state) => {
+    const a = Math.max(-1, Math.min(1, amount));
+    const existing = state.modMappings.find((x) => x.modId === modId && x.paramId === paramId);
+    return {
+      modMappings: existing
+        ? state.modMappings.map((x) => (x === existing ? { ...x, amount: a } : x))
+        : [...state.modMappings, { id: crypto.randomUUID(), modId, paramId, amount: a }],
+    };
+  }),
+  removeMapping: (id) => set((state) => ({ modMappings: state.modMappings.filter((x) => x.id !== id) })),
+  addAutomation: (paramId, points) => set((state) => ({
+    automation: state.automation.some((a) => a.paramId === paramId) ? state.automation : [...state.automation, { paramId, points }],
+  })),
+  setAutomationPoints: (paramId, points) => set((state) => ({
+    automation: state.automation.map((a) => (a.paramId === paramId ? { ...a, points: [...points].sort((p, q) => p.beat - q.beat) } : a)),
+  })),
+  removeAutomation: (paramId) => set((state) => ({ automation: state.automation.filter((a) => a.paramId !== paramId) })),
   midiRecordSource: 'played',
   setMidiRecordSource: (midiRecordSource) => set({ midiRecordSource }),
   viewMode: readFlag('sensi-mixer') ? 'mixer' : 'arrange',
@@ -390,7 +457,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     const nextChain = chain.filter((d) => d.uid !== uid);
     // The effect stays on while any track still has an instance of it.
     const stillUsed = Object.entries(state.trackDevices).some(
-      ([id, list]) => (id === trackId ? nextChain : list).some((d) => d.type === removed.type),
+      ([id, list]) => (id === trackId ? nextChain : list).some((d) => d.type === removed.type && state.devicePower[d.uid] !== false),
     );
     const removedFlag = DEVICE_FLAG[removed.type];
     return {

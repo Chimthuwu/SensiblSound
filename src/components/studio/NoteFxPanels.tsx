@@ -1,3 +1,4 @@
+import { Select } from './Select';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { ARP_MODES, ARP_RATES, NOTE_FX_DEFAULTS, SCALES, type FxParams, type NoteFxType } from '../../midi/noteFx';
 import { Unit } from './InstrumentPanels';
@@ -10,13 +11,13 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
 function Pick({ label, value, options, onChange }: { label: string; value: number; options: string[]; onChange: (i: number) => void }) {
   return (
     <div className="studio-mini-select">
-      <select value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} title={label}>
+      <Select value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} title={label}>
         {options.map((o, i) => (
           <option key={o} value={i}>
             {label}: {o}
           </option>
         ))}
-      </select>
+      </Select>
       <span className="studio-caret">▾</span>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useSessionStore } from '../stores/useSessionStore';
+import { getEffective, onModTick } from '../mod/modEngine';
 
 // One AudioContext for all playback (audio clips and MIDI instruments), a master bus every track feeds,
 // and level meters that tap tracks and the master without changing the sound.
@@ -38,9 +39,9 @@ export function masterIn(): GainNode {
     clip.oversample = '2x';
     master.connect(clip);
     clip.connect(c.destination);
-    useSessionStore.subscribe((s, prev) => {
-      if (s.masterVolume !== prev.masterVolume && master) master.gain.setTargetAtTime(s.masterVolume, c.currentTime, 0.015);
-    });
+    const applyMaster = () => { if (master) master.gain.setTargetAtTime(getEffective('master:vol', useSessionStore.getState().masterVolume), c.currentTime, 0.015); };
+    useSessionStore.subscribe((s, prev) => { if (s.masterVolume !== prev.masterVolume) applyMaster(); });
+    onModTick(applyMaster); // modulation / automation of the master fader
     createMeterTap(c, clip, 'master');
   }
   return master;
