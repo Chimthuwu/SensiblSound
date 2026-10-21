@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSessionStore } from '../../stores/useSessionStore';
-import { ALL_DEVICES, isInstrumentDevice, type DeviceId } from '../../types';
+import { ALL_DEVICES, deviceStage, isInstrumentDevice, isNoteFxDevice, type DeviceId, type DeviceStage } from '../../types';
+import { NoteFxPanel } from './NoteFxPanels';
+import { NOTE_FX_DEFAULTS, type NoteFxType } from '../../midi/noteFx';
 import { DrumPanel, SynthPanel } from './InstrumentPanels';
 import { Knob } from './Knob';
 import { useContextMenu, type MenuItem } from './ContextMenu';
@@ -22,6 +24,13 @@ const DEVICE_NAMES: Record<DeviceId, string> = {
   reverb: 'Reverb',
   synth: 'PsydeNote Lite',
   drums: 'Drum Machine',
+  arp: 'Arpeggiator',
+  chord: 'Chord',
+  transpose: 'Transpose',
+  noteFilter: 'Note Filter',
+  echo: 'Note Echo',
+  scale: 'Scale',
+  randomize: 'Randomize',
 };
 
 // Short label on each device's on/off switch.
@@ -34,6 +43,13 @@ const DEVICE_SWITCH_LABEL: Record<DeviceId, string> = {
   reverb: 'Verb',
   synth: 'On',
   drums: 'On',
+  arp: 'On',
+  chord: 'On',
+  transpose: 'On',
+  noteFilter: 'On',
+  echo: 'On',
+  scale: 'On',
+  randomize: 'On',
 };
 
 function Switch({
@@ -103,7 +119,25 @@ const DEVICE_INFO: Record<DeviceId, string> = {
   reverb: 'Room tail behind the vocal',
   synth: 'Instrument: a small PsydeNote with FM, two oscillators and a filter. Plays MIDI clips',
   drums: 'Instrument: eight synthesised drum pads. Plays MIDI clips',
+  arp: 'Note FX: turns held notes into a stepped pattern',
+  chord: 'Note FX: adds up to four notes above every note',
+  transpose: 'Note FX: shifts notes by semitones and octaves',
+  noteFilter: 'Note FX: lets through only notes in a key and velocity range',
+  echo: 'Note FX: repeats notes, fading and shifting each repeat',
+  scale: 'Note FX: snaps notes to a key and scale',
+  randomize: 'Note FX: varies velocity, timing and pitch a little',
 };
+
+const STAGE_LABEL: Record<DeviceStage, string> = { midi: 'MIDI FX', instrument: 'Instrument', audio: 'Audio FX' };
+
+/** Marks where each stage of the rack starts. The rack flows MIDI FX, then instrument, then audio FX. */
+function StageLabel({ stage }: { stage: DeviceStage }) {
+  return (
+    <div className="studio-fx-stage" data-stage={stage} title="The rack flows MIDI FX, then instrument, then audio FX">
+      <span>{STAGE_LABEL[stage]}</span>
+    </div>
+  );
+}
 
 function trackName(trackId: string, extraName?: string): string {
   if (trackId === 'backing') return 'Backing Track';
@@ -118,6 +152,8 @@ export function FXRack() {
   const setFxSettings = useSessionStore((s) => s.setFxSettings);
   const selectedTrackId = useSessionStore((s) => s.selectedTrackId);
   const trackDevices = useSessionStore((s) => s.trackDevices);
+  const midiFxParams = useSessionStore((s) => s.midiFxParams);
+  const setMidiFxParam = useSessionStore((s) => s.setMidiFxParam);
   const extraTracks = useSessionStore((s) => s.extraTracks);
   const addDevice = useSessionStore((s) => s.addDevice);
   const removeDevice = useSessionStore((s) => s.removeDevice);
@@ -159,7 +195,8 @@ export function FXRack() {
     ? Math.min(40, Math.round((fxSettings.compression / 100) * 40))
     : 0;
 
-  const renderDevice = (device: DeviceId) => {
+  const renderDevice = (device: DeviceId, uid: string) => {
+    if (isNoteFxDevice(device)) return <NoteFxPanel type={device as NoteFxType} uid={uid} />;
     switch (device) {
       case 'autotune':
         return (
@@ -350,6 +387,13 @@ export function FXRack() {
     reverb: fxSettings.reverbEnabled,
     synth: true,
     drums: true,
+    arp: true,
+    chord: true,
+    transpose: true,
+    noteFilter: true,
+    echo: true,
+    scale: true,
+    randomize: true,
   };
   const setFlag = (device: DeviceId, on: boolean) => {
     const key = {
@@ -360,7 +404,7 @@ export function FXRack() {
       delay: 'delayEnabled',
       reverb: 'reverbEnabled',
     } as const;
-    if (isInstrumentDevice(device)) return;
+    if (isInstrumentDevice(device) || isNoteFxDevice(device)) return;
     setFxSettings({ [key[device as keyof typeof key]]: on });
   };
 
@@ -392,7 +436,7 @@ export function FXRack() {
       <div
         ref={stripRef}
         className="studio-fx-grid"
-        data-disabled={String(!fxEnabled)}
+        data-disabled={String(!fxEnabled && !chain.some((d) => isInstrumentDevice(d.type)))}
         onContextMenu={(e) => openMenu(e, addDeviceItems())}
       >
           {chain.map((instance, index) => {
@@ -404,12 +448,16 @@ export function FXRack() {
             const dropBefore = reorder !== null && reorder.over === index && reorder.from !== index;
             const dropAfter =
               reorder !== null && reorder.over === chain.length && index === chain.length - 1;
+            const stage = deviceStage(device);
+            const startsStage = index === 0 || deviceStage(chain[index - 1].type) !== stage;
             return (
+            <Fragment key={instance.uid}>
+            {startsStage && <StageLabel stage={stage} />}
             <div
-              key={instance.uid}
               className="studio-fx-module"
               data-device-index={index}
-              data-off={String(!isInstrumentDevice(device) && !flagFor[device])}
+              data-off={String(isNoteFxDevice(device) ? (midiFxParams[instance.uid]?.on ?? 1) === 0 : !isInstrumentDevice(device) && !flagFor[device])}
+              data-stage={deviceStage(device)}
               data-instrument={String(isInstrumentDevice(device))}
               onContextMenu={(e) => {
                 e.stopPropagation();
@@ -459,7 +507,14 @@ export function FXRack() {
                   {DEVICE_NAMES[device]}
                   {copyCount > 1 ? ` ${copyNumber}` : ''}
                 </span>
-                {!isInstrumentDevice(device) && (
+                {isNoteFxDevice(device) ? (
+                  <Switch
+                    compact
+                    checked={(midiFxParams[instance.uid]?.on ?? NOTE_FX_DEFAULTS[device as NoteFxType].on) !== 0}
+                    onChange={(v) => setMidiFxParam(instance.uid, { on: v ? 1 : 0 })}
+                    label={DEVICE_SWITCH_LABEL[device]}
+                  />
+                ) : !isInstrumentDevice(device) && (
                   <Switch
                     compact
                     checked={flagFor[device]}
@@ -477,8 +532,9 @@ export function FXRack() {
                   ×
                 </button>
               </div>
-              {renderDevice(device)}
+              {renderDevice(device, instance.uid)}
             </div>
+            </Fragment>
             );
           })}
 

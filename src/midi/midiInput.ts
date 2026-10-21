@@ -1,6 +1,7 @@
 import { useSessionStore } from '../stores/useSessionStore';
 import type { MidiNote } from '../types';
-import { laneInstrument, previewNote, releaseNote } from './midiEngine';
+import { laneInstrument, laneNoteFx, previewNote, releaseNote } from './midiEngine';
+import { applyNoteFxChain, arpPick, ARP_RATES, type FxDevice, type FxNote } from './noteFx';
 
 // ---------------------------------------------------------------- drum note mapping
 // Controllers send pads on all sorts of notes (MPC-style 36 up, General MIDI drum kit, ...). Fold them onto the eight pads.
@@ -76,7 +77,62 @@ function closeAll(endMs: number) {
 const sustained = new Map<string, { lane: string; pitch: number }>();
 let pedal = false;
 
-/** A key goes down. Plays the target track's instrument and, when recording, captures the note. */
+// ---------------------------------------------------------------- live note FX
+// Played notes pass through the track's MIDI FX before the instrument, like the clip does. A live arpeggiator
+// keeps its own clock; echoes are scheduled ahead with timers. Recording always stores the notes as played.
+interface LiveHeld { fx: { pitch: number; vel: number }[]; sounding: { pitch: number }[] }
+const liveHeld = new Map<string, LiveHeld>(); // key = lane:rawPitch
+interface LiveArp { timer: number; counter: number; stepMs: number }
+const liveArps = new Map<string, LiveArp>();
+
+const msPerBeat = () => 60_000 / useSessionStore.getState().bpm;
+const asFx = (id: string, pitch: number, vel: number, len = 1): FxNote => ({ id, pitch, startBeat: 0, lenBeats: len, vel });
+
+/** Plays events from the chain after the arp (or the whole chain): immediate ones follow the key, delayed ones are timed. */
+function playFxEvents(lane: string, events: FxNote[], holdFirst: boolean, track?: LiveHeld) {
+  const mpb = msPerBeat();
+  const synth = laneInstrument(lane)?.kind === 'synth';
+  for (const e of events) {
+    if (e.startBeat <= 1e-6) {
+      previewNote(lane, e.pitch, e.vel, holdFirst && synth, Math.max(0.05, (e.lenBeats * mpb) / 1000));
+      if (holdFirst && synth) track?.sounding.push({ pitch: e.pitch });
+    } else {
+      window.setTimeout(() => previewNote(lane, e.pitch, e.vel, false, Math.max(0.05, (e.lenBeats * mpb) / 1000)), e.startBeat * mpb);
+    }
+  }
+}
+
+function splitAtArp(chain: FxDevice[]): { pre: FxDevice[]; arp: FxDevice | null; post: FxDevice[] } {
+  const i = chain.findIndex((d) => d.type === 'arp' && d.params.on !== 0);
+  return i < 0 ? { pre: chain, arp: null, post: [] } : { pre: chain.slice(0, i), arp: chain[i], post: chain.slice(i + 1) };
+}
+
+function startLiveArp(lane: string, arp: FxDevice, post: FxDevice[]) {
+  if (liveArps.has(lane)) return;
+  const stepMs = ARP_RATES[Math.min(ARP_RATES.length - 1, Math.max(0, Math.round(arp.params.rate)))].beats * msPerBeat();
+  const state: LiveArp = { counter: 0, stepMs, timer: 0 };
+  const tick = () => {
+    const pool: { pitch: number; vel: number }[] = [];
+    for (const [key, h] of liveHeld) if (key.startsWith(lane + ':')) pool.push(...h.fx);
+    const pick = arpPick(pool, state.counter++, arp.params);
+    if (pick) {
+      const len = Math.max(0.03, (stepMs / msPerBeat()) * Math.min(1, Math.max(0.05, arp.params.gate)));
+      const out = post.length ? applyNoteFxChain([asFx(`arp${state.counter}`, pick.pitch, pick.vel, len)], post) : [asFx('a', pick.pitch, pick.vel, len)];
+      playFxEvents(lane, out, false);
+    }
+  };
+  tick();
+  state.timer = window.setInterval(tick, stepMs);
+  liveArps.set(lane, state);
+}
+
+function stopLiveArpIfIdle(lane: string) {
+  for (const key of liveHeld.keys()) if (key.startsWith(lane + ':')) return;
+  const a = liveArps.get(lane);
+  if (a) { window.clearInterval(a.timer); liveArps.delete(lane); }
+}
+
+/** A key goes down. Plays the target track's instrument (through its MIDI FX) and, when recording, captures the note. */
 export function liveNoteOn(pitchIn: number, vel = 0.85, laneOverride?: string) {
   const lane = laneOverride && hasInstrument(laneOverride) ? laneOverride : targetLane();
   if (!lane) return;
@@ -84,7 +140,18 @@ export function liveNoteOn(pitchIn: number, vel = 0.85, laneOverride?: string) {
   const pitch = rig?.kind === 'drums' ? mapDrumNote(pitchIn) : pitchIn;
   const key = `${lane}:${pitch}`;
   sustained.delete(key);
-  previewNote(lane, pitch, vel, rig?.kind === 'synth');
+  const { pre, arp, post } = splitAtArp(laneNoteFx(lane));
+  const held: LiveHeld = { fx: [], sounding: [] };
+  const processed = pre.length ? applyNoteFxChain([asFx(key, pitch, vel)], pre) : [asFx(key, pitch, vel)];
+  if (arp) {
+    held.fx = processed.map((e) => ({ pitch: e.pitch, vel: e.vel }));
+    liveHeld.set(key, held);
+    startLiveArp(lane, arp, post);
+  } else {
+    const events = post.length ? applyNoteFxChain(processed, post) : processed;
+    liveHeld.set(key, held);
+    playFxEvents(lane, events, true, held);
+  }
   const rec = recordingLane();
   if (rec === lane) {
     const prev = open.get(key);
@@ -100,16 +167,25 @@ export function liveNoteOff(pitchIn: number, laneOverride?: string) {
   const pitch = rig?.kind === 'drums' ? mapDrumNote(pitchIn) : pitchIn;
   const key = `${lane}:${pitch}`;
   if (pedal && rig?.kind === 'synth') { sustained.set(key, { lane, pitch }); return; }
-  releaseNote(lane, pitch);
+  releaseLive(key, lane, pitch);
   const n = open.get(key);
   if (n) { commitNote(n, useSessionStore.getState().transportTimeMs); open.delete(key); }
+}
+
+/** Ends what a key started: the notes it is holding, or its place in a live arpeggio. */
+function releaseLive(key: string, lane: string, pitch: number) {
+  const h = liveHeld.get(key);
+  liveHeld.delete(key);
+  if (h) for (const s of h.sounding) releaseNote(lane, s.pitch);
+  else releaseNote(lane, pitch);
+  stopLiveArpIfIdle(lane);
 }
 
 function setPedal(down: boolean) {
   pedal = down;
   if (down) return;
   for (const [key, h] of [...sustained]) {
-    releaseNote(h.lane, h.pitch);
+    releaseLive(key, h.lane, h.pitch);
     const n = open.get(key);
     if (n) { commitNote(n, useSessionStore.getState().transportTimeMs); open.delete(key); }
     sustained.delete(key);
@@ -118,7 +194,8 @@ function setPedal(down: boolean) {
 
 function allNotesOff() {
   setPedal(false);
-  for (const [key, n] of [...open]) { releaseNote(n.lane, n.pitch); commitNote(n, useSessionStore.getState().transportTimeMs); open.delete(key); }
+  for (const [key, n] of [...open]) { releaseLive(key, n.lane, n.pitch); commitNote(n, useSessionStore.getState().transportTimeMs); open.delete(key); }
+  for (const key of [...liveHeld.keys()]) { const [lane, p] = key.split(':'); releaseLive(key, lane, Number(p)); }
 }
 
 // ---------------------------------------------------------------- Web MIDI

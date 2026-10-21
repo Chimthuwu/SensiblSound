@@ -94,9 +94,20 @@ export interface ExtraTrack {
 }
 
 // 'synth' and 'drums' are instruments: a MIDI clip only makes sound when its track's rack holds one.
-export type DeviceId = 'autotune' | 'doubler' | 'compressor' | 'eq' | 'delay' | 'reverb' | 'synth' | 'drums';
+export type DeviceId =
+  | 'autotune' | 'doubler' | 'compressor' | 'eq' | 'delay' | 'reverb'
+  | 'synth' | 'drums'
+  | 'arp' | 'chord' | 'transpose' | 'noteFilter' | 'echo' | 'scale' | 'randomize';
 
-export const ALL_DEVICES: DeviceId[] = ['autotune', 'doubler', 'compressor', 'eq', 'delay', 'reverb', 'synth', 'drums'];
+// A track's rack always flows MIDI FX -> instrument -> audio FX. Stages keep it that way.
+export type DeviceStage = 'midi' | 'instrument' | 'audio';
+export const NOTE_FX_DEVICES: DeviceId[] = ['arp', 'chord', 'transpose', 'noteFilter', 'echo', 'scale', 'randomize'];
+export const isNoteFxDevice = (d: DeviceId) => NOTE_FX_DEVICES.includes(d);
+export const deviceStage = (d: DeviceId): DeviceStage => (isNoteFxDevice(d) ? 'midi' : d === 'synth' || d === 'drums' ? 'instrument' : 'audio');
+const STAGE_ORDER: Record<DeviceStage, number> = { midi: 0, instrument: 1, audio: 2 };
+export const stageRank = (d: DeviceId) => STAGE_ORDER[deviceStage(d)];
+
+export const ALL_DEVICES: DeviceId[] = ['arp', 'chord', 'transpose', 'noteFilter', 'echo', 'scale', 'randomize', 'synth', 'drums', 'autotune', 'doubler', 'compressor', 'eq', 'delay', 'reverb'];
 
 export const INSTRUMENT_DEVICES: DeviceId[] = ['synth', 'drums'];
 export const isInstrumentDevice = (d: DeviceId) => d === 'synth' || d === 'drums';
@@ -186,6 +197,9 @@ export interface SessionState {
   // effect on/off in fxSettings.
   trackDevices: Record<string, DeviceInstance[]>;
   addDevice: (trackId: string, device: DeviceId) => void;
+  /** Settings of each note effect, by device instance (so two Transposes don't share knobs). Missing keys use the defaults. */
+  midiFxParams: Record<string, Record<string, number>>;
+  setMidiFxParam: (uid: string, patch: Record<string, number>) => void;
   removeDevice: (trackId: string, uid: string) => void;
 
   // Actions

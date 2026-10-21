@@ -6,7 +6,7 @@ import { Knob } from './Knob';
 const WAVES: SynthWave[] = ['sine', 'triangle', 'sawtooth', 'square'];
 const WAVE_LABEL: Record<SynthWave, string> = { sine: 'Sine', triangle: 'Tri', sawtooth: 'Saw', square: 'Square' };
 
-function Unit(props: {
+export function Unit(props: {
   label: string;
   value: number;
   min: number;

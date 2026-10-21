@@ -1427,3 +1427,11 @@ button.studio-midi-pill:hover { color: #fff; border-color: rgba(168, 85, 247, 0.
 .mx-btn[data-kind="s"][data-on="true"] { background: #38bdf8; color: #111; border-color: #38bdf8; }
 .mx-btn[data-kind="r"][data-on="true"] { background: #ef4444; color: #fff; border-color: #ef4444; }
 .mx-foot { text-align: center; font-size: 10px; color: #6b6675; }
+
+/* Rack stages: MIDI FX -> instrument -> audio FX */
+.studio-fx-stage { flex: 0 0 22px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: rgba(255, 255, 255, 0.04); color: #8b8299; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 9px; letter-spacing: 1.6px; text-transform: uppercase; user-select: none; }
+.studio-fx-stage[data-stage="midi"] { color: #5eead4; background: rgba(94, 234, 212, 0.08); }
+.studio-fx-stage[data-stage="instrument"] { color: #c084fc; background: rgba(192, 132, 252, 0.1); }
+.studio-fx-stage[data-stage="audio"] { color: #fbbf24; background: rgba(251, 191, 36, 0.08); }
+.studio-fx-module[data-stage="midi"] { border-top: 2px solid rgba(94, 234, 212, 0.6); }
+.studio-fx-module[data-stage="instrument"] { border-top: 2px solid rgba(192, 132, 252, 0.7); }

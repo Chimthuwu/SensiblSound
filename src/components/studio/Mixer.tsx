@@ -7,6 +7,7 @@ import type { DeviceId } from '../../types';
 const DEVICE_SHORT: Record<DeviceId, string> = {
   autotune: 'Autotune', doubler: 'Doubler', compressor: 'Dynamics', eq: 'EQ', delay: 'Delay', reverb: 'Reverb',
   synth: 'PsydeNote Lite', drums: 'Drum Machine',
+  arp: 'Arpeggiator', chord: 'Chord', transpose: 'Transpose', noteFilter: 'Note Filter', echo: 'Note Echo', scale: 'Scale', randomize: 'Randomize',
 };
 
 // Fader law: the fader position is the cube root of the gain, so the useful range (-30 dB to 0 dB) gets most of the travel.

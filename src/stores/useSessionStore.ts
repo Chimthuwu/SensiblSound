@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DEFAULT_DRUMS, DEFAULT_EQ_BANDS, DEFAULT_SYNTH, DEVICE_FLAG, SYNTH_PRESETS, makeDeviceInstance, isInstrumentDevice, type ExtraTrack, type MidiClip, type SessionState } from '../types';
+import { DEFAULT_DRUMS, DEFAULT_EQ_BANDS, DEFAULT_SYNTH, DEVICE_FLAG, SYNTH_PRESETS, makeDeviceInstance, isInstrumentDevice, stageRank, type DeviceInstance, type ExtraTrack, type MidiClip, type SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
@@ -245,6 +245,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   setMidiInputId: (midiInputId) => set({ midiInputId }),
   midiActivity: 0,
   bumpMidiActivity: () => set((state) => ({ midiActivity: state.midiActivity + 1 })),
+  midiFxParams: {},
+  setMidiFxParam: (uid, patch) => set((state) => ({ midiFxParams: { ...state.midiFxParams, [uid]: { ...(state.midiFxParams[uid] ?? {}), ...patch } } })),
   autoWarp: readFlag('sensi-autowarp'),
   setAutoWarp: (on) => { writeFlag('sensi-autowarp', on); set({ autoWarp: on }); },
   warpPromptDisabled: readFlag('sensi-warp-noask'),
@@ -362,7 +364,9 @@ export const useSessionStore = create<SessionState>((set) => ({
     const next = [...chain];
     const [moved] = next.splice(from, 1);
     next.splice(Math.max(0, Math.min(next.length, to)), 0, moved);
-    return { trackDevices: { ...state.trackDevices, [trackId]: next } };
+    // A device can move within its stage but never out of it: a stable sort by stage snaps it back.
+    const ordered = next.map((d, i) => ({ d, i })).sort((a, b) => stageRank(a.d.type) - stageRank(b.d.type) || a.i - b.i).map((x) => x.d);
+    return { trackDevices: { ...state.trackDevices, [trackId]: ordered } };
   }),
 
   setEqBand: (bandId, patch) => set((state) => ({
@@ -376,8 +380,13 @@ export const useSessionStore = create<SessionState>((set) => ({
   addDevice: (trackId, device) => set((state) => {
     const chain = state.trackDevices[trackId] ?? [];
     const flag = DEVICE_FLAG[device];
+    // New devices join the end of their own stage: MIDI FX, then instrument, then audio FX.
+    const rank = stageRank(device);
+    let at = chain.length;
+    while (at > 0 && stageRank(chain[at - 1].type) > rank) at--;
+    const nextChain: DeviceInstance[] = [...chain.slice(0, at), makeDeviceInstance(device), ...chain.slice(at)];
     return {
-      trackDevices: { ...state.trackDevices, [trackId]: [...chain, makeDeviceInstance(device)] },
+      trackDevices: { ...state.trackDevices, [trackId]: nextChain },
       fxSettings: flag ? { ...state.fxSettings, [flag]: true } : state.fxSettings,
     };
   }),
