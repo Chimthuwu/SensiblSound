@@ -1,3 +1,5 @@
+/* One height for every track: the header and its lane must match, and an armed track needs room for the monitor button and mic picker. */
+:root { --lane-h: 152px; }
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
@@ -300,7 +302,7 @@
 .studio-track-head {
   position: relative;
   overflow: hidden;
-  height: 118px;
+  height: var(--lane-h);
   border-bottom: 1px solid theme("colors.zinc-600");
   display: flex;
   position: relative;
@@ -323,10 +325,10 @@
 
 .studio-track-head-body {
   flex: 1;
-  padding: 11px 12px 11px 15px;
+  padding: 9px 12px 9px 15px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
   min-width: 0;
 }
 
@@ -479,7 +481,7 @@
 .studio-lanes { position: relative; }
 
 .studio-lane {
-  height: 118px;
+  height: var(--lane-h);
   border-bottom: 1px solid theme("colors.zinc-600");
   position: relative;
   background-color: #17141d;
@@ -1333,8 +1335,6 @@
 
 /* MIDI clips and the add-track row */
 .studio-midi-preview { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.studio-add-row { display: flex; gap: 6px; }
-.studio-add-row .studio-add-track { flex: 1; }
 .studio-drum-pads { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 10px 0; }
 
 /* MIDI editor: piano roll and drum steps */
@@ -1435,3 +1435,24 @@ button.studio-midi-pill:hover { color: #fff; border-color: rgba(168, 85, 247, 0.
 .studio-fx-stage[data-stage="audio"] { color: #fbbf24; background: rgba(251, 191, 36, 0.08); }
 .studio-fx-module[data-stage="midi"] { border-top: 2px solid rgba(94, 234, 212, 0.6); }
 .studio-fx-module[data-stage="instrument"] { border-top: 2px solid rgba(192, 132, 252, 0.7); }
+
+/* Volume (teal) and pan (amber) sliders in the track headers and the mixer */
+.studio input.studio-vol[type=range]::-webkit-slider-thumb { background: #2dd4bf; box-shadow: 0 0 9px rgba(45, 212, 191, 0.7); }
+.studio input.studio-vol[type=range]::-moz-range-thumb { background: #2dd4bf; box-shadow: 0 0 9px rgba(45, 212, 191, 0.7); }
+.studio input.studio-pan[type=range]::-webkit-slider-thumb, .studio .mx-pan input[type=range]::-webkit-slider-thumb { background: #fbbf24; box-shadow: 0 0 9px rgba(251, 191, 36, 0.7); }
+.studio input.studio-pan[type=range]::-moz-range-thumb, .studio .mx-pan input[type=range]::-moz-range-thumb { background: #fbbf24; box-shadow: 0 0 9px rgba(251, 191, 36, 0.7); }
+.studio-track-head-controls input.studio-pan { flex: 0 0 72px; }
+.mx-fader::-webkit-slider-thumb { box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6), inset 0 -3px 0 #2dd4bf; }
+
+/* Pop-ups live outside #root, so they take the theme (hue, saturation, contrast) themselves. */
+.studio-context-menu, .studio-device-browser, .studio-toast {
+  filter: hue-rotate(var(--hue-shift, 0deg)) saturate(var(--theme-sat, 1)) contrast(var(--theme-contrast, 1));
+}
+/* Knob names never run into their neighbours. */
+.studio-knob-unit { min-width: 0; }
+.studio-knob-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* MIDI editor in its own window: fills the window */
+.studio-midi-editor[data-popped="true"] { margin: 0; height: 100vh; border-radius: 0; display: flex; flex-direction: column; }
+.studio-midi-editor[data-popped="true"] .studio-roll-scroll { max-height: none; flex: 1 1 auto; }
+.studio-midi-empty { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 13px; color: #8b8299; background: #0b0910; }

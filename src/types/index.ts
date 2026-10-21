@@ -237,6 +237,10 @@ export interface SessionState {
   setTrackOrder: (ids: string[]) => void;
   toggleSoloTrack: (trackId: string) => void;
 
+  /** What MIDI recording stores: the notes as played, or what comes out of the track's MIDI FX (the instrument's input). */
+  midiRecordSource: 'played' | 'output';
+  setMidiRecordSource: (s: 'played' | 'output') => void;
+
   // Centre panel: the arrangement or the mixer.
   viewMode: 'arrange' | 'mixer';
   setViewMode: (m: 'arrange' | 'mixer') => void;
@@ -275,8 +279,6 @@ export interface SessionState {
   instruments: Record<string, Instrument>;
   /** Adds a MIDI clip to a lane. It stays silent until the lane's rack has an instrument. Returns the clip id. */
   addMidiClip: (laneId: string, opts?: { startMs?: number; bars?: number }) => string;
-  /** New track with an instrument in its rack and an empty MIDI clip. Returns the lane id. */
-  addMidiTrack: (kind: MidiKind, preset?: string) => string;
   removeMidiClip: (clipId: string) => void;
   updateMidiClip: (clipId: string, patch: Partial<Omit<MidiClip, 'id' | 'laneId'>>) => void;
   setMidiNotes: (clipId: string, notes: MidiNote[]) => void;

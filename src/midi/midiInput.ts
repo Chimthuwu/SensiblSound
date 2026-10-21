@@ -80,7 +80,8 @@ let pedal = false;
 // ---------------------------------------------------------------- live note FX
 // Played notes pass through the track's MIDI FX before the instrument, like the clip does. A live arpeggiator
 // keeps its own clock; echoes are scheduled ahead with timers. Recording always stores the notes as played.
-interface LiveHeld { fx: { pitch: number; vel: number }[]; sounding: { pitch: number }[] }
+interface LiveHeld { fx: { pitch: number; vel: number }[]; sounding: { pitch: number }[]; outKeys: string[] }
+let outSeq = 0;
 const liveHeld = new Map<string, LiveHeld>(); // key = lane:rawPitch
 interface LiveArp { timer: number; counter: number; stepMs: number }
 const liveArps = new Map<string, LiveArp>();
@@ -93,10 +94,19 @@ function playFxEvents(lane: string, events: FxNote[], holdFirst: boolean, track?
   const mpb = msPerBeat();
   const synth = laneInstrument(lane)?.kind === 'synth';
   for (const e of events) {
+    const captureOutput = recordingLane() === lane && useSessionStore.getState().midiRecordSource === 'output';
+    const at = useSessionStore.getState().transportTimeMs + e.startBeat * mpb;
     if (e.startBeat <= 1e-6) {
       previewNote(lane, e.pitch, e.vel, holdFirst && synth, Math.max(0.05, (e.lenBeats * mpb) / 1000));
-      if (holdFirst && synth) track?.sounding.push({ pitch: e.pitch });
+      if (holdFirst && synth) {
+        track?.sounding.push({ pitch: e.pitch });
+        // A held note's length is known when the key comes up, so it stays open until then.
+        if (captureOutput) { const k = `${lane}:out:${e.pitch}:${++outSeq}`; open.set(k, { lane, pitch: e.pitch, atMs: at, vel: e.vel }); track?.outKeys.push(k); }
+      } else if (captureOutput) {
+        commitNote({ lane, pitch: e.pitch, atMs: at, vel: e.vel }, at + e.lenBeats * mpb);
+      }
     } else {
+      if (captureOutput) commitNote({ lane, pitch: e.pitch, atMs: at, vel: e.vel }, at + e.lenBeats * mpb);
       window.setTimeout(() => previewNote(lane, e.pitch, e.vel, false, Math.max(0.05, (e.lenBeats * mpb) / 1000)), e.startBeat * mpb);
     }
   }
@@ -141,7 +151,7 @@ export function liveNoteOn(pitchIn: number, vel = 0.85, laneOverride?: string) {
   const key = `${lane}:${pitch}`;
   sustained.delete(key);
   const { pre, arp, post } = splitAtArp(laneNoteFx(lane));
-  const held: LiveHeld = { fx: [], sounding: [] };
+  const held: LiveHeld = { fx: [], sounding: [], outKeys: [] };
   const processed = pre.length ? applyNoteFxChain([asFx(key, pitch, vel)], pre) : [asFx(key, pitch, vel)];
   if (arp) {
     held.fx = processed.map((e) => ({ pitch: e.pitch, vel: e.vel }));
@@ -153,7 +163,7 @@ export function liveNoteOn(pitchIn: number, vel = 0.85, laneOverride?: string) {
     playFxEvents(lane, events, true, held);
   }
   const rec = recordingLane();
-  if (rec === lane) {
+  if (rec === lane && useSessionStore.getState().midiRecordSource === 'played') {
     const prev = open.get(key);
     if (prev) commitNote(prev, useSessionStore.getState().transportTimeMs);
     open.set(key, { lane, pitch, atMs: useSessionStore.getState().transportTimeMs, vel });
@@ -176,7 +186,11 @@ export function liveNoteOff(pitchIn: number, laneOverride?: string) {
 function releaseLive(key: string, lane: string, pitch: number) {
   const h = liveHeld.get(key);
   liveHeld.delete(key);
-  if (h) for (const s of h.sounding) releaseNote(lane, s.pitch);
+  if (h) {
+    for (const s of h.sounding) releaseNote(lane, s.pitch);
+    // Notes captured from the FX output end now, when the key comes up.
+    for (const k of h.outKeys) { const n = open.get(k); if (n) { commitNote(n, useSessionStore.getState().transportTimeMs); open.delete(k); } }
+  }
   else releaseNote(lane, pitch);
   stopLiveArpIfIdle(lane);
 }

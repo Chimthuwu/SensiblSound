@@ -7,6 +7,9 @@ import { transformClip } from '../../utils/clipTransform';
 import { ClipWaveform } from './ClipWaveform';
 import { MidiClipPreview } from './MidiClipPreview';
 import { onAudioAdded, warpLane } from '../../utils/warpActions';
+import { panFill, volumeFill } from '../../utils/sliderFill';
+import { bakeMidiFx, laneNoteFx, processedNotes } from '../../midi/midiEngine';
+import { encodeMidiFile } from '../../midi/smf';
 import type { MidiNote } from '../../types';
 import { useContextMenu, type MenuItem } from './ContextMenu';
 
@@ -76,7 +79,6 @@ export function Arrangement() {
   const addTrack = useSessionStore((s) => s.addTrack);
   const midiClips = useSessionStore((s) => s.midiClips);
   const addMidiClip = useSessionStore((s) => s.addMidiClip);
-  const addMidiTrack = useSessionStore((s) => s.addMidiTrack);
   const removeMidiClip = useSessionStore((s) => s.removeMidiClip);
   const updateMidiClip = useSessionStore((s) => s.updateMidiClip);
   const instruments = useSessionStore((s) => s.instruments);
@@ -333,7 +335,14 @@ export function Arrangement() {
     setClipStart(id, atMs);
   };
 
-  const laneMenuItems = (laneId: string): MenuItem[] => {
+  /** Timeline position (ms, snapped to a beat) under a mouse event on a lane. */
+  const msUnder = (e: { clientX: number; currentTarget: Element }) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const beat = Math.max(0, Math.floor((e.clientX - r.left) / BEAT_W));
+    return beat * (msPerBar / 4);
+  };
+
+  const laneMenuItems = (laneId: string, atMs?: number): MenuItem[] => {
     const lane = laneOf(laneId);
     const hasClip = !!lane && lane.clips.some((c) => !c.midi);
     const items: MenuItem[] = [
@@ -349,7 +358,16 @@ export function Arrangement() {
         onSelect: () => toggleDisabledTrack(laneId),
       },
       { kind: 'separator' },
-      { label: 'Add MIDI clip at playhead', onSelect: () => addMidiClip(laneId, { startMs: Math.round(transportTimeMs / (msPerBar / 4)) * (msPerBar / 4) }) },
+      {
+        label: atMs === undefined ? 'Add MIDI clip at playhead' : 'Add MIDI clip here',
+        onSelect: () => addMidiClip(laneId, { startMs: atMs ?? Math.round(transportTimeMs / (msPerBar / 4)) * (msPerBar / 4) }),
+      },
+      ...(hasInstrument(laneId)
+        ? []
+        : [
+            { label: 'Add PsydeNote Lite to the rack', onSelect: () => useSessionStore.getState().addDevice(laneId, 'synth') } as MenuItem,
+            { label: 'Add Drum Machine to the rack', onSelect: () => useSessionStore.getState().addDevice(laneId, 'drums') } as MenuItem,
+          ]),
       { label: 'Copy', disabled: !lane?.clips.some((c) => c.source), onSelect: () => copyLane(laneId) },
     ];
     if (isExtraTrack(laneId)) {
@@ -462,6 +480,23 @@ export function Arrangement() {
         onSelect: () => {
           const id = addMidiClip(laneId, { startMs: mc.startMs + mc.bars * 4 * (60_000 / bpm), bars: mc.bars });
           useSessionStore.getState().setMidiNotes(id, mc.notes.map((n) => ({ ...n, id: crypto.randomUUID() })));
+        },
+      },
+      {
+        label: 'Bake MIDI FX to new track',
+        disabled: mc.notes.length === 0 || laneNoteFx(laneId).length === 0 || !hasInstrument(laneId),
+        onSelect: () => { bakeMidiFx(mc.id); },
+      },
+      {
+        label: 'Export MIDI file',
+        disabled: mc.notes.length === 0,
+        onSelect: () => {
+          const hasFx = laneNoteFx(laneId).length > 0;
+          const drums = (trackDevices[laneId] ?? []).some((d) => d.type === 'drums');
+          const bytes = encodeMidiFile(hasFx ? processedNotes(mc) : mc.notes, bpm, { drums, name: laneOf(laneId)?.name ?? 'track' });
+          const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'audio/midi' }));
+          downloadBlobUrl(url, `${(laneOf(laneId)?.name ?? 'track').replace(/\s+/g, '-').toLowerCase()}-${hasFx ? 'fx-output' : 'notes'}.mid`);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
         },
       },
       { label: 'Clear notes', disabled: mc.notes.length === 0, onSelect: () => useSessionStore.getState().setMidiNotes(mc.id, []) },
@@ -586,8 +621,6 @@ export function Arrangement() {
         if (e.defaultPrevented) return;
         openMenu(e, [
           { label: 'Insert Audio Track', onSelect: () => addTrack() },
-          { label: 'Insert Synth Track', onSelect: () => addMidiTrack('synth') },
-          { label: 'Insert Drum Track', onSelect: () => addMidiTrack('drums') },
           ...(clipboard
             ? [{ label: 'Paste as New Track', onSelect: () => pasteAsNewTrack(transportTimeMs) }]
             : []),
@@ -753,7 +786,6 @@ export function Arrangement() {
                   </div>
                 </div>
                 <div className="studio-track-head-controls">
-                  <span className="studio-slider-label">Vol</span>
                   <input
                     className="studio-vol"
                     type="range"
@@ -762,10 +794,10 @@ export function Arrangement() {
                     value={Math.round((trackVolumes[lane.id] ?? 1) * 100)}
                     onChange={(e) => setTrackVolume(lane.id, Number(e.target.value) / 100)}
                     onClick={(e) => e.stopPropagation()}
+                    style={{ background: volumeFill(trackVolumes[lane.id] ?? 1) }}
                     aria-label={`${lane.name} volume`}
-                    title="Volume"
+                    title={`Volume ${Math.round((trackVolumes[lane.id] ?? 1) * 100)}%`}
                   />
-                  <span className="studio-slider-label">Pan</span>
                   <input
                     className="studio-pan"
                     type="range"
@@ -775,6 +807,7 @@ export function Arrangement() {
                     onChange={(e) => setTrackPan(lane.id, Number(e.target.value) / 100)}
                     onDoubleClick={() => setTrackPan(lane.id, 0)}
                     onClick={(e) => e.stopPropagation()}
+                    style={{ background: panFill(trackPans[lane.id] ?? 0) }}
                     aria-label={`${lane.name} pan`}
                     title={`Pan ${Math.round((trackPans[lane.id] ?? 0) * 100)} (double-click to centre)`}
                   />
@@ -878,14 +911,6 @@ export function Arrangement() {
           >
             + Track
           </button>
-          <div className="studio-add-row">
-            <button className="studio-add-track" type="button" onClick={() => addMidiTrack('synth')} title="New track with PsydeNote Lite and a MIDI clip">
-              + Synth
-            </button>
-            <button className="studio-add-track" type="button" onClick={() => addMidiTrack('drums')} title="New track with the Drum Machine and a MIDI clip">
-              + Drums
-            </button>
-          </div>
         </div>
 
         <div className="studio-timeline-col" ref={tColRef}>
@@ -919,7 +944,12 @@ export function Arrangement() {
                   data-track={lane.id}
                   data-muted={String(mutedTracks.has(lane.id))}
                   data-disabled={String(disabledTracks.has(lane.id))}
-                  onContextMenu={(e) => openMenu(e, laneMenuItems(lane.id))}
+                  onContextMenu={(e) => openMenu(e, laneMenuItems(lane.id, msUnder(e)))}
+                  onDoubleClick={(e) => {
+                    // Double-click empty space on any track: a MIDI clip starts there.
+                    if ((e.target as HTMLElement).closest('.studio-clip')) return;
+                    addMidiClip(lane.id, { startMs: msUnder(e) });
+                  }}
                   onDragOver={(e) => {
                     if (isEmptyExtraTrack(lane.id) && (hasFiles(e) || hasSample(e))) e.preventDefault();
                   }}
@@ -935,7 +965,7 @@ export function Arrangement() {
                         ? 'Import a backing track to start'
                         : lane.id === 'active_take'
                           ? 'Press record to capture a take'
-                          : isEmptyExtraTrack(lane.id) ? 'Drop audio here' : ''}
+                          : isEmptyExtraTrack(lane.id) ? 'Drop audio here, or double-click to add a MIDI clip' : ''}
                     </span>
                   )}
                   {lane.clips.map((c) => {
@@ -1038,8 +1068,6 @@ export function Arrangement() {
         onContextMenu={(e) =>
           openMenu(e, [
             { label: 'Insert Audio Track', onSelect: () => addTrack() },
-          { label: 'Insert Synth Track', onSelect: () => addMidiTrack('synth') },
-          { label: 'Insert Drum Track', onSelect: () => addMidiTrack('drums') },
             ...(clipboard
               ? [{ label: 'Paste as new track', onSelect: () => pasteAsNewTrack(transportTimeMs) }]
               : []),

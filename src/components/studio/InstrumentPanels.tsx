@@ -76,14 +76,14 @@ export function SynthPanel({ laneId }: { laneId: string }) {
         <Unit label="Osc 2" value={params.mix2} min={0} max={1} fmt={(v) => `${Math.round(v * 100)}%`} onChange={(mix2) => set({ mix2 })} />
         <Unit label="Detune" value={params.detune} min={-50} max={50} fmt={(v) => `${Math.round(v)}c`} onChange={(detune) => set({ detune })} />
         <Unit label="FM" value={params.fm} min={0} max={1} fmt={(v) => `${Math.round(v * 100)}%`} onChange={(fm) => set({ fm })} />
-        <Unit label="FM Ratio" value={params.fmRatio} min={0.5} max={8} step={0.5} onChange={(fmRatio) => set({ fmRatio })} />
+        <Unit label="Ratio" value={params.fmRatio} min={0.5} max={8} step={0.5} onChange={(fmRatio) => set({ fmRatio })} />
         <Unit label="Cutoff" value={Math.log2(params.cutoff)} min={Math.log2(80)} max={Math.log2(16000)} fmt={() => `${Math.round(params.cutoff)}Hz`} onChange={(v) => set({ cutoff: Math.round(Math.pow(2, v)) })} />
         <Unit label="Reso" value={params.resonance} min={0.1} max={18} onChange={(resonance) => set({ resonance })} />
-        <Unit label="Env Amt" value={params.filterEnv} min={0} max={4} fmt={(v) => `${v.toFixed(1)}oct`} onChange={(filterEnv) => set({ filterEnv })} />
-        <Unit label="Attack" value={params.attack} min={0.002} max={2} fmt={secs} onChange={(attack) => set({ attack })} />
-        <Unit label="Decay" value={params.decay} min={0.02} max={2} fmt={secs} onChange={(decay) => set({ decay })} />
-        <Unit label="Sustain" value={params.sustain} min={0} max={1} fmt={(v) => `${Math.round(v * 100)}%`} onChange={(sustain) => set({ sustain })} />
-        <Unit label="Release" value={params.release} min={0.02} max={3} fmt={secs} onChange={(release) => set({ release })} />
+        <Unit label="Env" value={params.filterEnv} min={0} max={4} fmt={(v) => `${v.toFixed(1)}oct`} onChange={(filterEnv) => set({ filterEnv })} />
+        <Unit label="Atk" value={params.attack} min={0.002} max={2} fmt={secs} onChange={(attack) => set({ attack })} />
+        <Unit label="Dec" value={params.decay} min={0.02} max={2} fmt={secs} onChange={(decay) => set({ decay })} />
+        <Unit label="Sust" value={params.sustain} min={0} max={1} fmt={(v) => `${Math.round(v * 100)}%`} onChange={(sustain) => set({ sustain })} />
+        <Unit label="Rel" value={params.release} min={0.02} max={3} fmt={secs} onChange={(release) => set({ release })} />
         <Unit label="Level" value={params.volume} min={0} max={1} fmt={(v) => `${Math.round(v * 100)}%`} onChange={(volume) => set({ volume })} />
       </div>
     </>

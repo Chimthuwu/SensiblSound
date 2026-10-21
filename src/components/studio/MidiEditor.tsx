@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { DRUM_PADS, type MidiNote } from '../../types';
 import { previewNote, releaseNote } from '../../midi/midiEngine';
 import { liveNoteOff, liveNoteOn } from '../../midi/midiInput';
+import { bakeMidiFx, laneNoteFx, processedNotes } from '../../midi/midiEngine';
+import { encodeMidiFile } from '../../midi/smf';
+import { downloadBlobUrl } from '../../utils/download';
 
 const STEP = 0.25; // beats: sixteenth notes
 const CELL_W = 22;
@@ -23,6 +27,21 @@ const DRUM_KEYS: Record<string, number> = {
   KeyA: 36, KeyS: 37, KeyD: 38, KeyF: 39, KeyG: 40, KeyH: 41, KeyJ: 42, KeyK: 43,
 };
 
+/** Downloads a clip as a .mid file. If the track has MIDI FX, the file holds what comes out of them. */
+function exportMidi(clipId: string) {
+  const st = useSessionStore.getState();
+  const clip = st.midiClips.find((c) => c.id === clipId);
+  if (!clip) return;
+  const hasFx = laneNoteFx(clip.laneId).length > 0;
+  const notes = hasFx ? processedNotes(clip) : clip.notes;
+  const drums = (st.trackDevices[clip.laneId] ?? []).some((d) => d.type === 'drums');
+  const lane = st.extraTracks.find((t) => t.id === clip.laneId)?.name ?? 'track';
+  const bytes = encodeMidiFile(notes, st.bpm, { drums, name: lane });
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'audio/midi' }));
+  downloadBlobUrl(url, `${lane.replace(/\s+/g, '-').toLowerCase()}-${hasFx ? 'fx-output' : 'notes'}.mid`);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
 /**
  * Edits the selected MIDI clip: a piano roll for synths, a step grid for the drum machine.
  * Click an empty cell to add a note, click a note to remove it, drag a note's right edge to resize.
@@ -38,6 +57,9 @@ export function MidiEditor() {
   const bpm = useSessionStore((s) => s.bpm);
   const transportTimeMs = useSessionStore((s) => s.transportTimeMs);
   const extraTracks = useSessionStore((s) => s.extraTracks);
+  const recordSource = useSessionStore((s) => s.midiRecordSource);
+  const setRecordSource = useSessionStore((s) => s.setMidiRecordSource);
+  const midiFxParams = useSessionStore((s) => s.midiFxParams);
 
   const clip = midiClips.find((c) => c.id === selectedClip?.clipId) ?? null;
   const laneId = clip?.laneId ?? '';
@@ -45,6 +67,8 @@ export function MidiEditor() {
   const kind = device?.type === 'drums' ? 'drums' : 'synth';
   const [resize, setResize] = useState<{ id: string; startX: number; len: number } | null>(null);
   const [octave, setOctave] = useState(0);
+  // The editor can live in its own browser window (second monitor). `root` is where it is drawn there.
+  const [pop, setPop] = useState<{ win: Window; root: HTMLElement } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const laneName = extraTracks.find((t) => t.id === laneId)?.name
     ?? (laneId === 'backing' ? 'Backing Track' : laneId === 'active_take' ? 'Vocal Take' : 'Layer');
@@ -76,16 +100,86 @@ export function MidiEditor() {
       if (!down.delete(e.code) || !id || k !== 'synth') return;
       if (KEY_MAP[e.code] !== undefined) liveNoteOff(48 + oct * 12 + KEY_MAP[e.code], id);
     };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
+    // The main window's shortcuts (Space, R, Home) don't reach a pop-out window, so repeat them there.
+    const onTransportKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('input, textarea, select, [contenteditable="true"]') || e.ctrlKey || e.metaKey || e.altKey) return;
+      const st = useSessionStore.getState();
+      if (e.code === 'Space') { e.preventDefault(); st.setIsPlaying(!st.isPlaying); }
+      else if (e.code === 'KeyR') { e.preventDefault(); st.setIsRecording(!st.isRecording); }
+      else if (e.code === 'Home') { e.preventDefault(); st.rewindTransport(); }
+    };
+    const wins: Window[] = pop ? [window, pop.win] : [window];
+    for (const w of wins) { w.addEventListener('keydown', onKeyDown); w.addEventListener('keyup', onKeyUp); }
+    pop?.win.addEventListener('keydown', onTransportKey);
 
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
+      for (const w of wins) { w.removeEventListener('keydown', onKeyDown); w.removeEventListener('keyup', onKeyUp); }
+      pop?.win.removeEventListener('keydown', onTransportKey);
     };
-  }, []);
+  }, [pop]);
 
-  if (!clip) return null;
+  // Keep the pop-out window's theme in step with the main window's, and close it with the app.
+  useEffect(() => {
+    if (!pop) return;
+    const copyTheme = () => { pop.win.document.documentElement.style.cssText = document.documentElement.style.cssText; };
+    const mo = new MutationObserver(copyTheme);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+    const onGone = () => setPop(null);
+    pop.win.addEventListener('pagehide', onGone);
+    const closeWith = () => pop.win.close();
+    window.addEventListener('beforeunload', closeWith);
+    return () => {
+      mo.disconnect();
+      pop.win.removeEventListener('pagehide', onGone);
+      window.removeEventListener('beforeunload', closeWith);
+    };
+  }, [pop]);
+
+  const openPop = () => {
+    const win = window.open('', 'sensi-midi-editor', 'popup=yes,width=1200,height=540');
+    if (!win) {
+      useSessionStore.getState().showToast('Popup blocked. Allow popups for this site to pop the editor out.');
+      return;
+    }
+    const doc = win.document;
+    doc.title = 'MIDI editor - SensiblSound';
+    if (!doc.getElementById('root')) {
+      for (const node of Array.from(document.head.querySelectorAll('link[rel="stylesheet"], style'))) doc.head.appendChild(node.cloneNode(true));
+      doc.documentElement.className = document.documentElement.className;
+      doc.documentElement.style.cssText = document.documentElement.style.cssText;
+      doc.body.className = document.body.className;
+      doc.body.style.cssText = 'margin:0;background:#0b0910;color:#e4e4e7;';
+      const el = doc.createElement('div');
+      el.id = 'root';
+      doc.body.appendChild(el);
+    }
+    setPop({ win, root: doc.getElementById('root') as HTMLElement });
+  };
+  const bringBack = () => {
+    pop?.win.close();
+    setPop(null);
+  };
+  const dockedNotice = pop ? (
+    <section className="studio-card studio-midi-editor" aria-label="MIDI editor (in a separate window)">
+      <div className="studio-card-head">
+        <h2 className="studio-card-head-title">MIDI editor</h2>
+        <span className="studio-tag">Open in a separate window</span>
+        <div className="studio-head-spacer" />
+        <button className="studio-mini-btn" type="button" onClick={() => { pop.win.focus(); }}>Show window</button>
+        <button className="studio-mini-btn" type="button" onClick={bringBack}>Bring back</button>
+      </div>
+    </section>
+  ) : null;
+
+  if (!clip) {
+    return pop ? (
+      <>
+        {createPortal(<div className="studio-midi-empty">Select a MIDI clip in the main window to edit it here.</div>, pop.root)}
+        {dockedNotice}
+      </>
+    ) : null;
+  }
 
   const notesAt = (pitch: number, beat: number) =>
     clip.notes.find((n) => n.pitch === pitch && beat >= n.startBeat - 1e-6 && beat < n.startBeat + n.lenBeats - 1e-6);
@@ -106,15 +200,25 @@ export function MidiEditor() {
   const playBeat = (transportTimeMs - clip.startMs) / msPerBeat;
   const showPlayhead = playBeat >= 0 && playBeat <= totalBeats;
   const headerLabel = kind === 'drums' ? 'Drum steps' : 'Piano roll';
+  // Re-evaluated whenever a MIDI FX setting or the rack changes (midiFxParams is in the dependency on purpose).
+  const hasNoteFx = midiFxParams !== undefined && laneNoteFx(laneId).length > 0;
 
-  return (
-    <section className="studio-card studio-midi-editor" aria-label="MIDI editor">
+  const editor = (
+    <section className="studio-card studio-midi-editor" data-popped={String(!!pop)} aria-label="MIDI editor">
       <div className="studio-card-head">
         <h2 className="studio-card-head-title">{headerLabel}</h2>
         <span className="studio-tag">{laneName}</span>
         <span className="studio-tag">{device ? (kind === 'drums' ? 'Drum Machine' : 'PsydeNote Lite') : 'No instrument'}</span>
         <div className="studio-head-spacer" />
         <div className="studio-head-right">
+          <button
+            className="studio-mini-btn"
+            type="button"
+            onClick={pop ? bringBack : openPop}
+            title={pop ? 'Dock the editor back into the main window' : 'Open the editor in its own window (a second monitor, say)'}
+          >
+            {pop ? '⧉ Dock' : '⧉ Pop out'}
+          </button>
           {kind === 'synth' && (
             <>
               <button className="studio-mini-btn" type="button" onClick={() => setOctave((o) => Math.max(-2, o - 1))} title="Computer keyboard octave down">Oct −</button>
@@ -123,6 +227,34 @@ export function MidiEditor() {
             </>
           )}
           {kind === 'drums' && <span className="studio-tag">Pads on A S D F G H J K</span>}
+          <select
+            className="studio-mini-btn"
+            value={recordSource}
+            onChange={(e) => setRecordSource(e.target.value as 'played' | 'output')}
+            aria-label="What MIDI recording captures"
+            title="What recording captures: the notes you play, or the notes coming out of the MIDI FX (what the instrument actually receives)"
+          >
+            <option value="played">Record: played notes</option>
+            <option value="output">Record: MIDI FX output</option>
+          </select>
+          <button
+            className="studio-mini-btn"
+            type="button"
+            disabled={!hasNoteFx || !device || clip.notes.length === 0}
+            onClick={() => bakeMidiFx(clip.id)}
+            title="Write what comes out of the MIDI FX into a new track (same instrument, no MIDI FX)"
+          >
+            Bake FX
+          </button>
+          <button
+            className="studio-mini-btn"
+            type="button"
+            disabled={clip.notes.length === 0}
+            onClick={() => exportMidi(clip.id)}
+            title="Download this clip as a .mid file (after the MIDI FX, if the track has any)"
+          >
+            Export .mid
+          </button>
           <select
             className="studio-mini-btn"
             value={clip.bars}
@@ -222,4 +354,10 @@ export function MidiEditor() {
       </div>
     </section>
   );
+  return pop ? (
+    <>
+      {createPortal(editor, pop.root)}
+      {dockedNotice}
+    </>
+  ) : editor;
 }

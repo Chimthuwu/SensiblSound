@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DEFAULT_DRUMS, DEFAULT_EQ_BANDS, DEFAULT_SYNTH, DEVICE_FLAG, SYNTH_PRESETS, makeDeviceInstance, isInstrumentDevice, stageRank, type DeviceInstance, type ExtraTrack, type MidiClip, type SessionState } from '../types';
+import { DEFAULT_DRUMS, DEFAULT_EQ_BANDS, DEFAULT_SYNTH, DEVICE_FLAG, makeDeviceInstance, isInstrumentDevice, stageRank, type DeviceInstance, type ExtraTrack, type MidiClip, type SessionState } from '../types';
 import { recordingHistoryIndex } from '../services/recordingHistoryIndex';
 import { isDriveConfigured } from '../lib/googleDrive';
 
@@ -233,6 +233,8 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   extraTracks: [],
 
+  midiRecordSource: 'played',
+  setMidiRecordSource: (midiRecordSource) => set({ midiRecordSource }),
   viewMode: readFlag('sensi-mixer') ? 'mixer' : 'arrange',
   setViewMode: (viewMode) => { writeFlag('sensi-mixer', viewMode === 'mixer'); set({ viewMode }); },
   masterVolume: 1,
@@ -271,16 +273,6 @@ export const useSessionStore = create<SessionState>((set) => ({
       };
     });
     return id;
-  },
-  addMidiTrack: (kind, preset) => {
-    const st = useSessionStore.getState();
-    const laneId = st.addTrack();
-    if (preset && SYNTH_PRESETS[preset]) {
-      st.setInstrument(laneId, { synth: { ...SYNTH_PRESETS[preset] } });
-    }
-    st.addDevice(laneId, kind);
-    st.addMidiClip(laneId);
-    return laneId;
   },
   removeMidiClip: (clipId) => set((state) => ({
     midiClips: state.midiClips.filter((c) => c.id !== clipId),

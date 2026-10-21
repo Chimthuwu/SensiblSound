@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useSessionStore } from '../../stores/useSessionStore';
 import { laneInfos, type LaneInfo } from '../../utils/lanes';
 import { readLevel } from '../../utils/audioBus';
+import { panFill } from '../../utils/sliderFill';
 import type { DeviceId } from '../../types';
 
 const DEVICE_SHORT: Record<DeviceId, string> = {
@@ -81,6 +82,7 @@ function Strip({
               onChange={(e) => setPan(id, Number(e.target.value) / 100)}
               onDoubleClick={() => setPan(id, 0)}
               onClick={(e) => e.stopPropagation()}
+              style={{ background: panFill(pan) }}
               aria-label={`${name} pan`} title="Pan (double-click to centre)"
             />
             <span className="mx-pan-val">{Math.abs(pan) < 0.02 ? 'C' : pan < 0 ? `${Math.round(-pan * 100)}L` : `${Math.round(pan * 100)}R`}</span>

@@ -102,9 +102,9 @@ export function useAudioPlayer(
     });
 
     wavesurfer.current.on('finish', () => {
+      // One clip ending must not stop the transport: other tracks (audio or MIDI) may still have music ahead.
+      // useTimer stops playback once everything on the timeline has finished.
       isWsPlayingRef.current = false;
-      // Optional: stop playing when finished, but wait for store sync
-      useSessionStore.getState().setIsPlaying(false);
     });
 
     wavesurfer.current.on('error', (err) => {

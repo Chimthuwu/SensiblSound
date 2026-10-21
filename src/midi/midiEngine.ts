@@ -102,7 +102,7 @@ export function laneNoteFx(laneId: string): FxDevice[] {
 const fxCache = new Map<string, { notes: MidiClip['notes']; key: string; out: FxNote[] }>();
 
 /** A clip's notes after the lane's MIDI FX, as note events in beats. */
-function processedNotes(clip: MidiClip): FxNote[] {
+export function processedNotes(clip: MidiClip): FxNote[] {
   const chain = laneNoteFx(clip.laneId);
   const key = JSON.stringify(chain);
   const hit = fxCache.get(clip.id);
@@ -111,6 +111,26 @@ function processedNotes(clip: MidiClip): FxNote[] {
   const out = chain.length ? applyNoteFxChain(input, chain) : input;
   fxCache.set(clip.id, { notes: clip.notes, key, out });
   return out;
+}
+
+/**
+ * Writes what comes out of a clip's MIDI FX into a new track: same instrument and settings, no MIDI FX, a clip of the
+ * resulting notes. Returns the new lane id (null if the clip or its instrument is missing).
+ */
+export function bakeMidiFx(clipId: string): string | null {
+  const st = useSessionStore.getState();
+  const clip = st.midiClips.find((c) => c.id === clipId);
+  const rig = clip ? laneInstrument(clip.laneId) : null;
+  if (!clip || !rig) return null;
+  const notes = processedNotes(clip);
+  const lastBeat = notes.reduce((m, n) => Math.max(m, n.startBeat + n.lenBeats), 0);
+  const lane = st.addTrack();
+  const inst = st.instruments[clip.laneId];
+  if (inst) st.setInstrument(lane, { synth: { ...inst.synth }, drums: { ...inst.drums } });
+  st.addDevice(lane, rig.kind);
+  const id = useSessionStore.getState().addMidiClip(lane, { startMs: clip.startMs, bars: Math.min(64, Math.max(1, Math.ceil(lastBeat / 4))) });
+  useSessionStore.getState().setMidiNotes(id, notes.map((n) => ({ id: crypto.randomUUID(), pitch: n.pitch, startBeat: n.startBeat, lenBeats: n.lenBeats, vel: n.vel })));
+  return lane;
 }
 
 function playNote(laneId: string, rig: { kind: MidiKind; inst: Instrument }, pitch: number, vel: number, when: number, durS: number | null) {
