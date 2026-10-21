@@ -1,5 +1,5 @@
 /* One height for every track: the header and its lane must match, and an armed track needs room for the monitor button and mic picker. */
-:root { --lane-h: 152px; }
+:root { --lane-h: 172px; }
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
@@ -1541,3 +1541,6 @@ input[data-driven="true"]::-webkit-slider-thumb { outline: 2px solid #fbbf24; ou
 .studio-ruler-loop[data-on="false"] { opacity: 0.35; filter: grayscale(1); }
 .studio-ruler-loop[data-on="true"] { background: rgba(251, 191, 36, 0.28); border-color: #fbbf24; }
 .studio-loop-btn[data-on="true"] { color: #fbbf24; border-color: rgba(251, 191, 36, 0.7); box-shadow: 0 0 12px rgba(251, 191, 36, 0.35); }
+
+/* Volume and pan each get a full-width row of their own (they were sharing one). */
+.studio-track-head-controls input.studio-vol, .studio-track-head-controls input.studio-pan { flex: 1 1 100%; width: 100%; min-width: 0; }
