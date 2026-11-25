@@ -84,3 +84,6 @@ Browser vocal-recording DAW (React + Vite + Web Audio). Live: https://sounds-sen
 - Branch `feat/studio-skin` is the working branch; `main` is the old UI.
 - `src/components/studio/` is the live UI. `src/components/tracks/*` is the old UI and nothing imports it any more. `effects/` (old VocalFxRack) was removed.
 - Headless Edge screenshots work for layout checks (`msedge --headless=new --screenshot`). Mic and file import do not.
+
+## Inbox (agent-proposed)
+
